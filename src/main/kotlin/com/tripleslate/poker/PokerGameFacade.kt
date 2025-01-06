@@ -3,14 +3,21 @@ package com.tripleslate.poker
 import com.tripleslate.com.tripleslate.poker.Card
 import com.tripleslate.com.tripleslate.poker.CardSuit
 import com.tripleslate.com.tripleslate.poker.CardValue
-import com.tripleslate.poker.PokerGame.Player
+import com.tripleslate.poker.PokerGame.RoundSummary
 
 class PokerSimulator(
     private val strategies: Map<Int, PokerStrategy>
 ) {
 
     fun runSimulation() {
-        val pokerGame = PokerGame(4)
+        val pokerGame = PokerGame()
+
+        // 4 players
+        pokerGame.addPlayer(Player(0))
+        pokerGame.addPlayer(Player(1))
+        pokerGame.addPlayer(Player(2))
+        pokerGame.addPlayer(Player(3))
+
         val pokerFacade = PokerGameFacade(pokerGame)
 
         pokerFacade.startNewHand()
@@ -35,7 +42,7 @@ class PokerSimulator(
             }
         }
 
-        pokerFacade.resetGame()
+        pokerFacade.concludeRound()
     }
 
 }
@@ -55,7 +62,10 @@ interface PokerStrategyEnvironment {
     fun raise(amount: Int)
 }
 
-class PokerGameFacade(private val pokerGame: PokerGame) {
+class PokerGameFacade(
+    private val pokerGame: PokerGame,
+
+) {
 
     private var roundActive: Boolean = false
     private var bettingRoundActive: Boolean = false
@@ -76,7 +86,7 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
     // Start a new hand
     fun startNewHand() {
         pokerGame.dealHoleCards()
-        pokerGame.postBlinds(1, 2)
+        // pokerGame.postBlinds(1, 2)
         roundActive = true
         bettingRoundActive = true
         currentPhase = Phase.PREFLOP
@@ -211,19 +221,22 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
     }
 
     fun getWinners(): Set<Player> {
-        return pokerGame.getWinners().map {
-            Player(it)
+        return pokerGame.getWinners().map { playerId ->
+            getActivePlayers().first { it.id == playerId }
         }.toSet()
     }
 
-    // Reset the game for a new hand
-    fun resetGame() {
-        pokerGame.reset()
+    fun concludeRound(): RoundSummary {
+        val roundSummary = pokerGame.concludeRound()
         pokerGame.nextDealer()
         roundActive = false
         bettingRoundActive = false
         currentPhase = Phase.PREFLOP
+
+        return roundSummary
     }
+
+
 
     enum class Action {
         CALL,
@@ -238,7 +251,15 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
 
 // Example Usage
 fun main() {
-    val pokerGame = PokerGame(4)
+    val pokerGame = PokerGame()
+
+    val player3 = Player(3, 6f)
+    // 4 players
+    pokerGame.addPlayer(Player(0))
+    pokerGame.addPlayer(Player(1))
+    pokerGame.addPlayer(Player(2))
+    pokerGame.addPlayer(player3)
+
     val pokerFacade = PokerGameFacade(pokerGame)
 
     pokerFacade.startNewHand() // Start a new hand
@@ -279,8 +300,8 @@ fun main() {
     pokerFacade.getActivePlayers().forEach {
         println("[${it.id}] ${pokerFacade.holeCardsForPlayer(it)}")
     }
-    println(pokerFacade.getWinners())
 
+    println(pokerGame.concludeRound())
 
     val communityCards = listOf(
         // Card(CardValue.ACE, CardSuit.SPADES),

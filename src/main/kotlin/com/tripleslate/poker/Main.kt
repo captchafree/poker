@@ -12,11 +12,11 @@ fun main(args: Array<String>) {
 
     val calculator = HandEquityCalculator()
     calculator.setHoleCards("ac as")
-    calculator.setNumOpponents(3)
+    calculator.setNumOpponents(1)
 
     println(calculator.computeCurrentEquity())
 
-    // return
+    return
 
     PokerCLI().main(args)
 }

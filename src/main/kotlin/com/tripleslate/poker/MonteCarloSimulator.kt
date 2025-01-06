@@ -17,7 +17,11 @@ class MonteCarloSimulator(
         var numLosses = 0
 
         for (i in 1..numSimulations) {
-            val pokerGame = PokerGame(numPlayers)
+            val pokerGame = PokerGame()
+
+            for (i in 0 until numPlayers) {
+                pokerGame.addPlayer(Player(i))
+            }
 
             pokerGame.startNewHandWithSeed(
                 fixedHoleCards = mapOf(0 to holeCards),
