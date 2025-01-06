@@ -5,22 +5,22 @@ import com.tripleslate.com.tripleslate.poker.CardDeck
 
 class PokerGame {
 
-    val players: MutableList<Player> = mutableListOf()
+    val players: MutableList<IPlayer> = mutableListOf()
 
     private var deck: CardDeck = CardDeck.newStandardDeck().apply { shuffle() }
-    private val pot: MutableMap<Player, Int> = mutableMapOf()
+    val pot: MutableMap<IPlayer, Int> = mutableMapOf()
 
-    private val roundBets: MutableMap<Player, Int> = mutableMapOf()
+    val roundBets: MutableMap<IPlayer, Int> = mutableMapOf()
     private var currentBet: Int = 0
     var dealerIndex: Int = 0
-    var activePlayers: MutableList<Player> = players.toMutableList()
+    var activePlayers: MutableList<IPlayer> = players.toMutableList()
     val communityCards: MutableList<Card> = mutableListOf()
     val holeCards: MutableList<MutableList<Card>> = mutableListOf()
 
     val numPlayers: Int
         get() = players.size
 
-    fun addPlayer(player: Player) {
+    fun addPlayer(player: IPlayer) {
         require(holeCards.isEmpty()) {
             "Cannot add a player in the middle of a hand"
         }
@@ -30,7 +30,7 @@ class PokerGame {
         }
     }
 
-    fun removePlayer(player: Player) {
+    fun removePlayer(player: IPlayer) {
         require(holeCards.isEmpty()) {
             "Cannot remove a player in the middle of a hand"
         }
@@ -79,7 +79,7 @@ class PokerGame {
     fun startNewBettingRound() {
         currentBet = 0
         roundBets.clear()
-        players.forEach { roundBets[it] = 0 }
+        // players.forEach { roundBets[it] = 0 }
     }
 
     fun dealHoleCards() {
@@ -136,12 +136,12 @@ class PokerGame {
         bigBlindPlayer.removeAmountFromBankroll(bigBlind.toFloat())
     }
 
-    fun fold(player: Player) {
+    fun fold(player: IPlayer) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         activePlayers.remove(player)
     }
 
-    fun call(player: Player) {
+    fun call(player: IPlayer) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         val amountToCall = currentBet - (roundBets[player] ?: 0)
         require(amountToCall > 0) { "Player ${player.id} has already matched the current bet." }
@@ -156,7 +156,7 @@ class PokerGame {
         pot[player] = (pot[player] ?: 0) + amountToCall
     }
 
-    fun raise(player: Player, amount: Int) {
+    fun raise(player: IPlayer, amount: Int) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         require(amount > 0) { "Raise amount must be positive." }
 
@@ -175,9 +175,10 @@ class PokerGame {
         pot[player] = (pot[player] ?: 0) + raiseAmount
     }
 
-    fun check(player: Player) {
+    fun check(player: IPlayer) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         require((roundBets[player] ?: 0) == currentBet) { "Player ${player.id} cannot check without matching the current bet of $currentBet." }
+        roundBets[player] = 0
     }
 
     fun getPotTotal(): Int {
@@ -220,15 +221,21 @@ class PokerGame {
 
         nextDealer()
 
-        this.reset()
-
         return RoundSummary(
-            winners.map { playerIdx ->
+            communityCards = communityCards.map { it },
+            holeCards = holeCards.mapIndexed { idx, cards ->
+                players.first {
+                    it.id == idx
+                } to cards
+            }.toMap(),
+            winners = winners.map { playerIdx ->
                 players.first {
                     playerIdx == it.id
                 }
             }.toSet()
-        )
+        ).also {
+            this.reset()
+        }
     }
 
     private fun reset() {
@@ -241,7 +248,9 @@ class PokerGame {
     }
 
     data class RoundSummary(
-        val winners: Set<Player>,
+        val communityCards: List<Card>,
+        val holeCards: Map<IPlayer, List<Card>>,
+        val winners: Set<IPlayer>,
     )
 }
 

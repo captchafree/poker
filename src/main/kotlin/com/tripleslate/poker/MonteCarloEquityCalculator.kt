@@ -2,7 +2,7 @@ package com.tripleslate.poker
 
 import com.tripleslate.com.tripleslate.poker.Card
 
-class MonteCarloSimulator(
+class MonteCarloEquityCalculator(
     val numSimulations: Int = 100_000
 ) {
 

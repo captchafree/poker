@@ -47,13 +47,13 @@ class HandEquityCalculator {
     }
 
     fun computeCurrentEquity(
-        progressListener: MonteCarloSimulator.ProgressListener = MonteCarloSimulator.ProgressListener.Companion.NOOP,
+        progressListener: MonteCarloEquityCalculator.ProgressListener = MonteCarloEquityCalculator.ProgressListener.Companion.NOOP,
     ): Float {
         require(holeCards.isNotEmpty() && holeCards.size <= 2) { "Must set hole cards before computing equity" }
 
-        val monteCarloSimulator = MonteCarloSimulator()
+        val monteCarloEquityCalculator = MonteCarloEquityCalculator()
 
-        val simulationResult = monteCarloSimulator.evaluate(
+        val simulationResult = monteCarloEquityCalculator.evaluate(
             numPlayers = 1 + this.numOpponents,
             holeCards = this.holeCards,
             communityCards = this.communityCards,

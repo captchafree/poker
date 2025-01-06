@@ -6,7 +6,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.prompt
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.mordant.platform.MultiplatformSystem.exitProcess
-import com.tripleslate.poker.MonteCarloSimulator.ProgressListener
+import com.tripleslate.poker.MonteCarloEquityCalculator.ProgressListener
 
 fun main(args: Array<String>) {
 

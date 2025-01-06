@@ -5,88 +5,55 @@ import com.tripleslate.com.tripleslate.poker.CardSuit
 import com.tripleslate.com.tripleslate.poker.CardValue
 import com.tripleslate.poker.PokerGame.RoundSummary
 
-class PokerSimulator(
-    private val strategies: Map<Int, PokerStrategy>
-) {
-
-    fun runSimulation() {
-        val pokerGame = PokerGame()
-
-        // 4 players
-        pokerGame.addPlayer(Player(0))
-        pokerGame.addPlayer(Player(1))
-        pokerGame.addPlayer(Player(2))
-        pokerGame.addPlayer(Player(3))
-
-        val pokerFacade = PokerGameFacade(pokerGame)
-
-        pokerFacade.startNewHand()
-
-        val currentPlayer = Player(pokerFacade.getActivePlayers().first().id + 1)
-
-        val env = object : PokerStrategyEnvironment {
-            override fun fold() {
-                pokerGame.fold(currentPlayer)
-            }
-
-            override fun check() {
-                pokerGame.check(currentPlayer)
-            }
-
-            override fun call() {
-                pokerGame.call(currentPlayer)
-            }
-
-            override fun raise(amount: Int) {
-                pokerGame.raise(currentPlayer, amount)
-            }
-        }
-
-        pokerFacade.concludeRound()
-    }
-
-}
-
 interface PokerStrategy {
 
     fun executeTurn(
-        game: PokerGame,
+        game: PokerGameFacade,
         environment: PokerStrategyEnvironment
     )
+
+    companion object
 }
 
 interface PokerStrategyEnvironment {
+    val currentPlayer: IPlayer
     fun fold()
     fun check()
+    fun checkOrFold()
     fun call()
     fun raise(amount: Int)
 }
 
 class PokerGameFacade(
     private val pokerGame: PokerGame,
-
 ) {
 
     private var roundActive: Boolean = false
     private var bettingRoundActive: Boolean = false
     private var currentPhase: Phase = Phase.PREFLOP
 
+    private var hasReceivedPreFlopActionFromBigBlind = false
+
     // Track the next player to act
     private var nextToActIndex: Int = 0
-
-    init {
-        require(pokerGame.numPlayers > 1) { "The game requires at least 2 players." }
-    }
 
     // Enum to track the current phase of the game
     enum class Phase {
         PREFLOP, FLOP, TURN, RIVER, SHOWDOWN
     }
 
+    val underlyingGame
+        get() = pokerGame
+
+    fun isRoundActive(): Boolean = roundActive
+
+    fun getNextToAct(): IPlayer {
+        return pokerGame.players[nextToActIndex]
+    }
+
     // Start a new hand
     fun startNewHand() {
         pokerGame.dealHoleCards()
-        // pokerGame.postBlinds(1, 2)
         roundActive = true
         bettingRoundActive = true
         currentPhase = Phase.PREFLOP
@@ -95,13 +62,13 @@ class PokerGameFacade(
     }
 
     // Proceed with the player's action, ensuring they're not acting out of turn
-    fun playerAction(player: Player, action: Action, amount: Int = 0) {
+    fun playerAction(player: IPlayer, action: Action, amount: Int = 0) {
         if (!roundActive) {
             throw IllegalStateException("Round is not active. Please start a new hand.")
         }
 
-        if (!bettingRoundActive) {
-            throw IllegalStateException("Betting round has concluded.")
+        if (isBettingRoundComplete()) {
+            throw IllegalStateException("Betting round has concluded. Can't $action")
         }
 
         val currentPlayer = pokerGame.players[nextToActIndex]
@@ -114,34 +81,86 @@ class PokerGameFacade(
             Action.FOLD -> {
                 pokerGame.fold(player)
             }
+            Action.CHECK -> {
+                pokerGame.check(player)
+            }
             Action.CALL -> {
                 pokerGame.call(player)
             }
             Action.RAISE -> {
                 pokerGame.raise(player, amount)
             }
-            Action.CHECK -> {
-                pokerGame.check(player)
-            }
+        }
+
+        if (
+            currentPhase == Phase.PREFLOP &&
+            pokerGame.players[(pokerGame.dealerIndex + 2) % pokerGame.numPlayers] == player
+        ) {
+            hasReceivedPreFlopActionFromBigBlind = true
         }
 
         // Move to the next player after the current action
         moveToNextPlayer()
     }
 
+    fun isBettingRoundComplete(): Boolean {
+        // Conditions for betting round completion:
+        // 1. All active players have taken action, and the actions are resolved.
+        // 2. No players have raised or there's a call matching the highest bet amount.
+        val highestBet = pokerGame.roundBets.values.maxOrNull()
+
+        if (currentPhase == Phase.PREFLOP && !hasReceivedPreFlopActionFromBigBlind) {
+            return false
+        }
+
+        return pokerGame.roundBets.keys.containsAll(pokerGame.activePlayers) && pokerGame.activePlayers.all { player ->
+            // Each active player has either folded, gone all-in, or matched the highest bet
+            player.bankroll <= 0f ||
+            pokerGame.roundBets[player] == highestBet
+        }
+    }
+
     // Move to the next player, ensuring the betting round continues correctly
     private fun moveToNextPlayer() {
+        // Check if the betting round is over
+        if (isBettingRoundComplete()) {
+            bettingRoundActive = false
+
+            // Transition to the next phase of the game
+            when (currentPhase) {
+                Phase.PREFLOP -> {
+                    dealFlop()
+                    bettingRoundActive = true // New betting round starts
+                }
+                Phase.FLOP -> {
+                    dealTurn()
+                    bettingRoundActive = true // New betting round starts
+                }
+                Phase.TURN -> {
+                    dealRiver()
+                    bettingRoundActive = true // New betting round starts
+                }
+                Phase.RIVER -> {
+                    // After the river, move to showdown
+                    currentPhase = Phase.SHOWDOWN
+                    bettingRoundActive = false
+                    roundActive = false
+                }
+                else -> {
+                    bettingRoundActive = false
+                    roundActive = false
+                    // throw IllegalStateException("Unexpected phase: $currentPhase")
+                }
+            }
+
+            nextToActIndex = pokerGame.dealerIndex
+        }
+
+        // Advance to the next active player
         do {
             nextToActIndex = (nextToActIndex + 1) % pokerGame.numPlayers
         } while (nextToActIndex !in pokerGame.activePlayers.map { it.id })
-
-//        // End the betting round once the dealer has acted
-//        if (nextToActIndex == pokerGame.dealerIndex) {
-//            bettingRoundActive = false
-//            nextPhase()
-//        }
     }
-
 
     // Deal the flop and advance to the post-flop phase
     fun dealFlop(): List<Card> {
@@ -149,7 +168,7 @@ class PokerGameFacade(
         val flop = pokerGame.dealFlop()
         currentPhase = Phase.FLOP
 
-        nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
+        // nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
         moveToNextPlayer()
 
         return flop
@@ -161,7 +180,7 @@ class PokerGameFacade(
         val turn = pokerGame.dealTurnOrRiver()
         currentPhase = Phase.TURN
 
-        nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
+        // nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
         moveToNextPlayer()
 
         return turn
@@ -173,7 +192,7 @@ class PokerGameFacade(
         val river = pokerGame.dealTurnOrRiver()
         currentPhase = Phase.RIVER
 
-        nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
+        // nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
         moveToNextPlayer()
 
         return river
@@ -201,7 +220,7 @@ class PokerGameFacade(
     }
 
     // Get a list of active players
-    fun getActivePlayers(): List<Player> {
+    fun getActivePlayers(): List<IPlayer> {
         return pokerGame.activePlayers
     }
 
@@ -216,27 +235,27 @@ class PokerGameFacade(
     }
 
     // Get hole cards for a player
-    fun holeCardsForPlayer(player: Player): List<Card> {
+    fun holeCardsForPlayer(player: IPlayer): List<Card> {
         return pokerGame.holeCards[player.id]
     }
 
-    fun getWinners(): Set<Player> {
+    fun getWinners(): Set<IPlayer> {
         return pokerGame.getWinners().map { playerId ->
             getActivePlayers().first { it.id == playerId }
         }.toSet()
     }
 
     fun concludeRound(): RoundSummary {
+        roundActive = false
+
         val roundSummary = pokerGame.concludeRound()
         pokerGame.nextDealer()
-        roundActive = false
         bettingRoundActive = false
         currentPhase = Phase.PREFLOP
+        hasReceivedPreFlopActionFromBigBlind = false
 
         return roundSummary
     }
-
-
 
     enum class Action {
         CALL,
@@ -245,8 +264,6 @@ class PokerGameFacade(
         CHECK
     }
 }
-
-
 
 
 // Example Usage
