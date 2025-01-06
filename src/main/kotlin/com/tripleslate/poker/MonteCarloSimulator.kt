@@ -2,7 +2,9 @@ package com.tripleslate.poker
 
 import com.tripleslate.com.tripleslate.poker.Card
 
-class MonteCarloSimulator {
+class MonteCarloSimulator(
+    val numSimulations: Int = 100_000
+) {
 
     fun evaluate(
         numPlayers: Int,
@@ -10,7 +12,6 @@ class MonteCarloSimulator {
         communityCards: List<Card>,
         progressListener: ProgressListener = ProgressListener.NOOP,
     ): Float {
-        val numSimulations = 100_000
         var numWins = 0
         var numTies = 0
         var numLosses = 0

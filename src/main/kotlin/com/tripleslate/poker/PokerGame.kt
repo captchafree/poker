@@ -6,9 +6,10 @@ import com.tripleslate.poker.PokerGame.Player
 
 class PokerGame(val numPlayers: Int) {
 
-    private var deck: CardDeck = CardDeck.Companion.newStandardDeck()
+    private var deck: CardDeck = CardDeck.newStandardDeck()
     val players: List<Player> = List(numPlayers) { Player(it) }
     private val pot: MutableMap<Player, Int> = mutableMapOf()
+    private val roundBets: MutableMap<Player, Int> = mutableMapOf() // Track bets in the current round
     private var currentBet: Int = 0
     var dealerIndex: Int = 0
     var activePlayers: MutableList<Player> = players.toMutableList()
@@ -18,7 +19,10 @@ class PokerGame(val numPlayers: Int) {
     init {
         require(numPlayers > 1) { "The game requires at least 2 players." }
         deck.shuffle()
-        players.forEach { pot[it] = 0 }
+        players.forEach {
+            pot[it] = 0
+            roundBets[it] = 0
+        }
     }
 
     fun startNewHandWithSeed(
@@ -50,6 +54,12 @@ class PokerGame(val numPlayers: Int) {
         }
     }
 
+    fun startNewBettingRound() {
+        currentBet = 0
+        roundBets.clear()
+        players.forEach { roundBets[it] = 0 }
+    }
+
     fun dealHoleCards() {
         require(activePlayers.size >= 2) { "Cannot deal cards with less than 2 active players." }
         holeCards.clear()
@@ -60,12 +70,15 @@ class PokerGame(val numPlayers: Int) {
         for (i in 0 + dealerIndex until (players.size * 2) + dealerIndex) {
             holeCards[i % players.size].add(deck.dealCard())
         }
+
+        startNewBettingRound()
     }
 
     fun dealFlop(): List<Card> {
         deck.dealCard() // Burn one card
         return listOf(deck.dealCard(), deck.dealCard(), deck.dealCard()).also {
             communityCards.addAll(it)
+            startNewBettingRound()
         }
     }
 
@@ -73,6 +86,7 @@ class PokerGame(val numPlayers: Int) {
         deck.dealCard() // Burn one card
         return deck.dealCard().also {
             communityCards.add(it)
+            startNewBettingRound()
         }
     }
 
@@ -85,6 +99,10 @@ class PokerGame(val numPlayers: Int) {
 
         pot[smallBlindPlayer] = smallBlind
         pot[bigBlindPlayer] = bigBlind
+
+        roundBets[smallBlindPlayer] = smallBlind
+        roundBets[bigBlindPlayer] = bigBlind
+
         currentBet = bigBlind
     }
 
@@ -95,8 +113,10 @@ class PokerGame(val numPlayers: Int) {
 
     fun call(player: Player) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
-        val amountToCall = currentBet - (pot[player] ?: 0)
+        val amountToCall = currentBet - (roundBets[player] ?: 0)
         require(amountToCall > 0) { "Player ${player.id} has already matched the current bet." }
+
+        roundBets[player] = (roundBets[player] ?: 0) + amountToCall
         pot[player] = (pot[player] ?: 0) + amountToCall
     }
 
@@ -104,14 +124,30 @@ class PokerGame(val numPlayers: Int) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         require(amount > 0) { "Raise amount must be positive." }
 
-        val totalBet = currentBet + amount
-        currentBet = totalBet
-        pot[player] = (pot[player] ?: 0) + totalBet
+        val newBet = currentBet + amount
+        val raiseAmount = newBet - (roundBets[player] ?: 0)
+        require(raiseAmount > 0) { "Raise amount must exceed the player's current bet in this round." }
+
+        currentBet = newBet
+        roundBets[player] = (roundBets[player] ?: 0) + raiseAmount
+        pot[player] = (pot[player] ?: 0) + raiseAmount
     }
 
     fun check(player: Player) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
-        require((pot[player] ?: 0) >= currentBet) { "Player ${player.id} cannot check without matching the current bet of $currentBet." }
+        require((roundBets[player] ?: 0) == currentBet) { "Player ${player.id} cannot check without matching the current bet of $currentBet." }
+    }
+
+    fun reset() {
+        holeCards.clear()
+        pot.clear()
+        roundBets.clear()
+        communityCards.clear()
+        deck = CardDeck.newStandardDeck()
+    }
+
+    fun getPotTotal(): Int {
+        return pot.values.sum()
     }
 
     fun nextDealer() {
@@ -120,7 +156,7 @@ class PokerGame(val numPlayers: Int) {
 
     fun getWinners(): Set<Int> {
         require(communityCards.size == 5) { "Exactly 5 community cards must be shown. There are ${communityCards.size} currently shown." }
-        val hands = players.associateWith {
+        val hands = activePlayers.associateWith {
             communityCards + holeCards[it.id]
         }.toList()
 
@@ -139,19 +175,9 @@ class PokerGame(val numPlayers: Int) {
         }
     }
 
-    fun reset() {
-        holeCards.clear()
-        pot.clear()
-        communityCards.clear()
-        deck = CardDeck.Companion.newStandardDeck()
-    }
-
-    fun getPotTotal(): Int {
-        return pot.values.sum()
-    }
-
     data class Player(val id: Int)
 }
+
 
 // Example Usage
 fun main() {

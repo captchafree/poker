@@ -61,9 +61,6 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
     private var bettingRoundActive: Boolean = false
     private var currentPhase: Phase = Phase.PREFLOP
 
-    private val playersWhoHaveActedThisRound = mutableMapOf<Int, Int>()
-    private val foldedPlayers = mutableListOf<Int>()
-
     // Track the next player to act
     private var nextToActIndex: Int = 0
 
@@ -80,8 +77,6 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
     fun startNewHand() {
         pokerGame.dealHoleCards()
         pokerGame.postBlinds(1, 2)
-        playersWhoHaveActedThisRound[(pokerGame.dealerIndex + 1) % pokerGame.numPlayers] = 1
-        playersWhoHaveActedThisRound[(pokerGame.dealerIndex + 2) % pokerGame.numPlayers] = 2
         roundActive = true
         bettingRoundActive = true
         currentPhase = Phase.PREFLOP
@@ -108,19 +103,15 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
         when (action) {
             Action.FOLD -> {
                 pokerGame.fold(player)
-                foldedPlayers.add(nextToActIndex)
             }
             Action.CALL -> {
                 pokerGame.call(player)
-                playersWhoHaveActedThisRound[nextToActIndex] = playersWhoHaveActedThisRound.maxBy { it.value }.value
             }
             Action.RAISE -> {
                 pokerGame.raise(player, amount)
-                playersWhoHaveActedThisRound[nextToActIndex] = playersWhoHaveActedThisRound.maxByOrNull { it.value }?.value?.plus(amount) ?: amount
             }
             Action.CHECK -> {
                 pokerGame.check(player)
-                playersWhoHaveActedThisRound[nextToActIndex] = playersWhoHaveActedThisRound.maxByOrNull { it.value }?.value ?: 0
             }
         }
 
@@ -132,7 +123,7 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
     private fun moveToNextPlayer() {
         do {
             nextToActIndex = (nextToActIndex + 1) % pokerGame.numPlayers
-        } while (nextToActIndex in foldedPlayers)
+        } while (nextToActIndex !in pokerGame.activePlayers.map { it.id })
 
 //        // End the betting round once the dealer has acted
 //        if (nextToActIndex == pokerGame.dealerIndex) {
@@ -219,20 +210,10 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
         return pokerGame.holeCards[player.id]
     }
 
-    fun getWinner(): Player {
-        println(getCommunityCards())
-        for (player in pokerGame.players) {
-            println(holeCardsForPlayer(player))
-        }
-
-        val hands = pokerGame.players.associateWith {
-            getCommunityCards() + holeCardsForPlayer(it)
-        }.toList()
-
-
-        val winner = hands.sortedWith(compareBy(HandRankUtils.handComparator()) { it.second })
-
-        return winner.last().first
+    fun getWinners(): Set<Player> {
+        return pokerGame.getWinners().map {
+            Player(it)
+        }.toSet()
     }
 
     // Reset the game for a new hand
@@ -242,8 +223,6 @@ class PokerGameFacade(private val pokerGame: PokerGame) {
         roundActive = false
         bettingRoundActive = false
         currentPhase = Phase.PREFLOP
-        playersWhoHaveActedThisRound.clear()
-        foldedPlayers.clear()
     }
 
     enum class Action {
@@ -297,7 +276,10 @@ fun main() {
 
     println("Pot total after river: ${pokerFacade.getPotTotal()}")
 
-    println(pokerFacade.getWinner())
+    pokerFacade.getActivePlayers().forEach {
+        println("[${it.id}] ${pokerFacade.holeCardsForPlayer(it)}")
+    }
+    println(pokerFacade.getWinners())
 
 
     val communityCards = listOf(

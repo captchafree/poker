@@ -9,6 +9,15 @@ import com.github.ajalt.mordant.platform.MultiplatformSystem.exitProcess
 import com.tripleslate.poker.MonteCarloSimulator.ProgressListener
 
 fun main(args: Array<String>) {
+
+    val calculator = HandEquityCalculator()
+    calculator.setHoleCards("ac as")
+    calculator.setNumOpponents(3)
+
+    println(calculator.computeCurrentEquity())
+
+    // return
+
     PokerCLI().main(args)
 }
 
