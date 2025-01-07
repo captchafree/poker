@@ -1,7 +1,5 @@
 package com.tripleslate.poker
 
-import com.tripleslate.com.tripleslate.poker.Card
-
 class MonteCarloEquityCalculator(
     val numSimulations: Int = 100_000
 ) {
@@ -12,6 +10,10 @@ class MonteCarloEquityCalculator(
         communityCards: List<Card>,
         progressListener: ProgressListener = ProgressListener.NOOP,
     ): Float {
+        if (numPlayers == 1) {
+            return 1f
+        }
+
         var numWins = 0
         var numTies = 0
         var numLosses = 0
@@ -20,7 +22,7 @@ class MonteCarloEquityCalculator(
             val pokerGame = PokerGame()
 
             for (i in 0 until numPlayers) {
-                pokerGame.addPlayer(Player(i))
+                pokerGame.addPlayer(DefaultPlayer(i))
             }
 
             pokerGame.startNewHandWithSeed(

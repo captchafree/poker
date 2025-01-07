@@ -1,12 +1,12 @@
 package com.tripleslate.poker
 
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.random.Random
-import kotlin.random.nextInt
 
 class PokerSimulator(
-    private val players: Map<out IPlayer, PokerStrategy>
+    private val players: Map<out Player, PokerStrategy>
 ) {
 
     fun runSimulation(): PokerGame.RoundSummary {
@@ -24,7 +24,7 @@ class PokerSimulator(
 
             val env = object : PokerStrategyEnvironment {
 
-                override val currentPlayer: IPlayer
+                override val currentPlayer: Player
                     get() = nextToAct
 
                 override fun fold() {
@@ -49,7 +49,7 @@ class PokerSimulator(
                         pokerFacade.playerAction(nextToAct, PokerGameFacade.Action.CALL)
                     } catch (e: Exception) {
                         // println(e.message)
-                        check()
+                        checkOrFold()
                     }
                 }
 
@@ -156,7 +156,12 @@ object GoodPotOdds : PokerStrategy {
         if (equity > potOdds) {
             if (amountToCall == 0) {
                 if (Random.nextBoolean()) {
-                    environment.raise(amount = max(1, ceil(Random.nextInt(1, 4) * equity * potSize).toInt()))
+                    if ((game.underlyingGame.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
+                        environment.call()
+                        return
+                    }
+
+                    environment.raise(amount = max(1, ceil(Random.nextInt(1, 2) * equity * potSize).toInt()))
                 } else {
                     environment.call()
                 }
@@ -164,7 +169,23 @@ object GoodPotOdds : PokerStrategy {
                 when (Random.nextInt(3)) {
                     0 -> environment.call()
                     1 -> environment.raise(amount = 2)
-                    2 -> environment.raise(amount = max(1, ceil(Random.nextInt(1, 4) * equity * potSize).toInt()))
+                    2 -> {
+                        if ((game.underlyingGame.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
+                            environment.call()
+                            return
+                        }
+
+                        val randomPart = Random.nextInt(1, 4)
+
+                        val raiseAmount = ceil(Random.nextInt(1, 2) * equity * potSize).toInt()
+                        println("[$equity] [$potSize] [$randomPart] = $raiseAmount")
+
+                        for (e in game.underlyingGame.pot) {
+                            println("${e.key}: ${e.value}")
+                        }
+
+                        environment.raise(amount = max(1, 2))
+                    }
                 }
             }
         } else {
@@ -175,7 +196,7 @@ object GoodPotOdds : PokerStrategy {
 
 
 class MonteCarloPokerStrategyEvaluator(
-    val players: Map<out IPlayer, PokerStrategy>,
+    val players: Map<out Player, PokerStrategy>,
     val numSimulations: Int = 1_000
 ) {
 
@@ -194,7 +215,7 @@ class MonteCarloPokerStrategyEvaluator(
         override var chipDifference: Float,
     ) : StrategyResults
 
-    fun evaluate(): Map<IPlayer, StrategyResults> {
+    fun evaluate(): Map<Player, StrategyResults> {
         val results = players.keys.associateWith {
             StrategyResultsImpl(players.size - 1, 0, 0, 0f)
         }
@@ -238,13 +259,13 @@ fun PokerStrategy.Companion.randomAction() = RandomAction
 fun PokerStrategy.Companion.useGoodPotOdds() = GoodPotOdds
 
 fun main() {
-    val player1 = Player(0, bankroll = 1_000_000f)
-    val player2 = Player(1, bankroll = 1_000_000f)
-    val player3 = Player(2, bankroll = 1_000_000f)
+    val player1 = DefaultPlayer(0, bankroll = 1_000_000f)
+    val player2 = DefaultPlayer(1, bankroll = 1_000_000f)
+    val player3 = DefaultPlayer(2, bankroll = 1_000_000f)
 
     val playerStrategies = mapOf(
-        player1 to PokerStrategy.alwaysCall(),
-        player2 to PokerStrategy.randomAction(),
+        player1 to PokerStrategy.useGoodPotOdds(),
+        player2 to PokerStrategy.useGoodPotOdds(),
         player3 to PokerStrategy.useGoodPotOdds(),
     )
 
@@ -258,6 +279,7 @@ fun main() {
     val evaluationResults = evaluator.evaluate()
 
     for ((player, result) in evaluationResults) {
-        println("[${player.id}] [$${player.bankroll}] ${result.wins}-${result.losses}-${result.draws} (${result.chipDifference})")
+        val percentChange = ((player.bankroll - 1_000_000f) / 1_000_000) * 100f
+        println("[${player.id}] [$${player.bankroll}] ${result.wins}-${result.losses}-${result.draws} (${result.chipDifference}) ($percentChange%)")
     }
 }

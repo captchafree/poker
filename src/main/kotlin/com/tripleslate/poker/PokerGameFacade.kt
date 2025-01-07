@@ -1,8 +1,5 @@
 package com.tripleslate.poker
 
-import com.tripleslate.com.tripleslate.poker.Card
-import com.tripleslate.com.tripleslate.poker.CardSuit
-import com.tripleslate.com.tripleslate.poker.CardValue
 import com.tripleslate.poker.PokerGame.RoundSummary
 
 interface PokerStrategy {
@@ -16,7 +13,7 @@ interface PokerStrategy {
 }
 
 interface PokerStrategyEnvironment {
-    val currentPlayer: IPlayer
+    val currentPlayer: Player
     fun fold()
     fun check()
     fun checkOrFold()
@@ -47,7 +44,7 @@ class PokerGameFacade(
 
     fun isRoundActive(): Boolean = roundActive
 
-    fun getNextToAct(): IPlayer {
+    fun getNextToAct(): Player {
         return pokerGame.players[nextToActIndex]
     }
 
@@ -62,7 +59,7 @@ class PokerGameFacade(
     }
 
     // Proceed with the player's action, ensuring they're not acting out of turn
-    fun playerAction(player: IPlayer, action: Action, amount: Int = 0) {
+    fun playerAction(player: Player, action: Action, amount: Int = 0) {
         if (!roundActive) {
             throw IllegalStateException("Round is not active. Please start a new hand.")
         }
@@ -88,6 +85,7 @@ class PokerGameFacade(
                 pokerGame.call(player)
             }
             Action.RAISE -> {
+                println("Player ${player.id} raised by $amount")
                 pokerGame.raise(player, amount)
             }
         }
@@ -220,7 +218,7 @@ class PokerGameFacade(
     }
 
     // Get a list of active players
-    fun getActivePlayers(): List<IPlayer> {
+    fun getActivePlayers(): List<Player> {
         return pokerGame.activePlayers
     }
 
@@ -235,11 +233,11 @@ class PokerGameFacade(
     }
 
     // Get hole cards for a player
-    fun holeCardsForPlayer(player: IPlayer): List<Card> {
+    fun holeCardsForPlayer(player: Player): List<Card> {
         return pokerGame.holeCards[player.id]
     }
 
-    fun getWinners(): Set<IPlayer> {
+    fun getWinners(): Set<Player> {
         return pokerGame.getWinners().map { playerId ->
             getActivePlayers().first { it.id == playerId }
         }.toSet()
@@ -270,11 +268,11 @@ class PokerGameFacade(
 fun main() {
     val pokerGame = PokerGame()
 
-    val player3 = Player(3, 6f)
+    val player3 = DefaultPlayer(3, 6f)
     // 4 players
-    pokerGame.addPlayer(Player(0))
-    pokerGame.addPlayer(Player(1))
-    pokerGame.addPlayer(Player(2))
+    pokerGame.addPlayer(DefaultPlayer(0))
+    pokerGame.addPlayer(DefaultPlayer(1))
+    pokerGame.addPlayer(DefaultPlayer(2))
     pokerGame.addPlayer(player3)
 
     val pokerFacade = PokerGameFacade(pokerGame)

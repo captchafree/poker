@@ -1,6 +1,5 @@
 package com.tripleslate.poker
 
-import com.tripleslate.com.tripleslate.poker.Card
 import java.util.Collections
 import kotlin.collections.plus
 

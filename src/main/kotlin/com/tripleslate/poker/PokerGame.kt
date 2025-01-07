@@ -1,26 +1,27 @@
 package com.tripleslate.poker
 
-import com.tripleslate.com.tripleslate.poker.Card
-import com.tripleslate.com.tripleslate.poker.CardDeck
-
 class PokerGame {
 
-    val players: MutableList<IPlayer> = mutableListOf()
+    val players: MutableList<Player> = mutableListOf()
+
+    var activePlayers: MutableList<Player> = players.toMutableList()
 
     private var deck: CardDeck = CardDeck.newStandardDeck().apply { shuffle() }
-    val pot: MutableMap<IPlayer, Int> = mutableMapOf()
 
-    val roundBets: MutableMap<IPlayer, Int> = mutableMapOf()
+    val pot: MutableMap<Player, Int> = mutableMapOf()
+
     private var currentBet: Int = 0
+    val roundBets: MutableMap<Player, Int> = mutableMapOf()
+
     var dealerIndex: Int = 0
-    var activePlayers: MutableList<IPlayer> = players.toMutableList()
-    val communityCards: MutableList<Card> = mutableListOf()
+
     val holeCards: MutableList<MutableList<Card>> = mutableListOf()
+    val communityCards: MutableList<Card> = mutableListOf()
 
     val numPlayers: Int
         get() = players.size
 
-    fun addPlayer(player: IPlayer) {
+    fun addPlayer(player: Player) {
         require(holeCards.isEmpty()) {
             "Cannot add a player in the middle of a hand"
         }
@@ -30,7 +31,7 @@ class PokerGame {
         }
     }
 
-    fun removePlayer(player: IPlayer) {
+    fun removePlayer(player: Player) {
         require(holeCards.isEmpty()) {
             "Cannot remove a player in the middle of a hand"
         }
@@ -44,6 +45,7 @@ class PokerGame {
     ) {
         require(numPlayers > 1) { "The game requires at least 2 players." }
 
+        deck = CardDeck.newStandardDeck()
         deck.shuffle()
         holeCards.clear()
         activePlayers = players.toMutableList()
@@ -79,7 +81,6 @@ class PokerGame {
     fun startNewBettingRound() {
         currentBet = 0
         roundBets.clear()
-        // players.forEach { roundBets[it] = 0 }
     }
 
     fun dealHoleCards() {
@@ -98,7 +99,7 @@ class PokerGame {
 
         startNewBettingRound()
 
-        postBlinds(1, 2)
+        // postBlinds(1, 2)
     }
 
     fun dealFlop(): List<Card> {
@@ -136,14 +137,14 @@ class PokerGame {
         bigBlindPlayer.removeAmountFromBankroll(bigBlind.toFloat())
     }
 
-    fun fold(player: IPlayer) {
+    fun fold(player: Player) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         activePlayers.remove(player)
     }
 
-    fun call(player: IPlayer) {
+    fun call(player: Player) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
-        val amountToCall = currentBet - (roundBets[player] ?: 0)
+        val amountToCall = currentBet - player.getRoundBetOrZero()
         require(amountToCall > 0) { "Player ${player.id} has already matched the current bet." }
 
         require(player.bankroll >= amountToCall) {
@@ -152,16 +153,16 @@ class PokerGame {
 
         player.removeAmountFromBankroll(amountToCall.toFloat())
 
-        roundBets[player] = (roundBets[player] ?: 0) + amountToCall
-        pot[player] = (pot[player] ?: 0) + amountToCall
+        roundBets[player] = player.getRoundBetOrZero() + amountToCall
+        pot[player] = player.getTotalPotBetOrZero() + amountToCall
     }
 
-    fun raise(player: IPlayer, amount: Int) {
+    fun raise(player: Player, amount: Int) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         require(amount > 0) { "Raise amount must be positive." }
 
         val newBet = currentBet + amount
-        val raiseAmount = newBet - (roundBets[player] ?: 0)
+        val raiseAmount = newBet - player.getRoundBetOrZero()
         require(raiseAmount > 0) { "Raise amount must exceed the player's current bet in this round." }
 
         require(player.bankroll >= raiseAmount) {
@@ -171,13 +172,21 @@ class PokerGame {
         player.removeAmountFromBankroll(raiseAmount.toFloat())
 
         currentBet = newBet
-        roundBets[player] = (roundBets[player] ?: 0) + raiseAmount
-        pot[player] = (pot[player] ?: 0) + raiseAmount
+        roundBets[player] = player.getRoundBetOrZero() + raiseAmount
+        pot[player] = player.getTotalPotBetOrZero() + raiseAmount
     }
 
-    fun check(player: IPlayer) {
+    private fun Player.getRoundBetOrZero(): Int {
+        return roundBets[this] ?: 0
+    }
+
+    private fun Player.getTotalPotBetOrZero(): Int {
+        return pot[this] ?: 0
+    }
+
+    fun check(player: Player) {
         require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
-        require((roundBets[player] ?: 0) == currentBet) { "Player ${player.id} cannot check without matching the current bet of $currentBet." }
+        require(player.getRoundBetOrZero() == currentBet) { "Player ${player.id} cannot check without matching the current bet of $currentBet." }
         roundBets[player] = 0
     }
 
@@ -228,6 +237,9 @@ class PokerGame {
                     it.id == idx
                 } to cards
             }.toMap(),
+            playerBets = players.associateWith {
+                it.getTotalPotBetOrZero()
+            },
             winners = winners.map { playerIdx ->
                 players.first {
                     playerIdx == it.id
@@ -244,17 +256,17 @@ class PokerGame {
         pot.clear()
         roundBets.clear()
         communityCards.clear()
-        deck = CardDeck.newStandardDeck()
     }
 
     data class RoundSummary(
         val communityCards: List<Card>,
-        val holeCards: Map<IPlayer, List<Card>>,
-        val winners: Set<IPlayer>,
+        val holeCards: Map<Player, List<Card>>,
+        val playerBets: Map<Player, Int>,
+        val winners: Set<Player>,
     )
 }
 
-interface IPlayer {
+interface Player {
     val id: Int
     val bankroll: Float
 
@@ -262,10 +274,10 @@ interface IPlayer {
     fun removeAmountFromBankroll(amount: Float)
 }
 
-data class Player(
+data class DefaultPlayer(
     override val id: Int,
     override var bankroll: Float = 1000f
-): IPlayer {
+): Player {
 
     override fun addAmountToBankroll(amount: Float) {
         bankroll += amount
@@ -281,7 +293,7 @@ data class Player(
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other !is Player) return false
+        if (other !is DefaultPlayer) return false
 
         if (id != other.id) return false
 
@@ -299,20 +311,20 @@ fun main() {
     val game = PokerGame()
 
     // 4 players
-    game.addPlayer(Player(0))
-    game.addPlayer(Player(1))
-    game.addPlayer(Player(2))
-    game.addPlayer(Player(3))
+    game.addPlayer(DefaultPlayer(0))
+    game.addPlayer(DefaultPlayer(1))
+    game.addPlayer(DefaultPlayer(2))
+    game.addPlayer(DefaultPlayer(3))
 
     game.dealHoleCards() // Deal hole cards to players
     game.postBlinds(1, 2)
 
     println("Pot total: ${game.getPotTotal()}")
 
-    game.call(Player(4))
-    game.call(Player(1))
-    game.call(Player(2))
-    game.check(Player(3))
+    game.call(DefaultPlayer(4))
+    game.call(DefaultPlayer(1))
+    game.call(DefaultPlayer(2))
+    game.check(DefaultPlayer(3))
 
     println("Pot total: ${game.getPotTotal()}")
 

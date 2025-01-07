@@ -1,3 +1,6 @@
+import org.codehaus.groovy.tools.shell.util.Logger.io
+import org.gradle.kotlin.dsl.testImplementation
+
 plugins {
     kotlin("jvm") version "2.0.21"
     // application
@@ -24,7 +27,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 }
 
-tasks.test {
+tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 kotlin {
@@ -36,4 +39,6 @@ dependencies {
 
     // optional support for rendering markdown in help messages
     implementation("com.github.ajalt.clikt:clikt-markdown:5.0.1")
+
+    testImplementation("io.kotest:kotest-runner-junit5:5.9.0")
 }

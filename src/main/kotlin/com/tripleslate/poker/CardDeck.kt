@@ -1,4 +1,4 @@
-package com.tripleslate.com.tripleslate.poker
+package com.tripleslate.poker
 
 interface CardDeck {
 

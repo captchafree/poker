@@ -1,8 +1,5 @@
 package com.tripleslate.poker
 
-import com.tripleslate.com.tripleslate.poker.Card
-import com.tripleslate.com.tripleslate.poker.CardValue
-
 enum class HandRank(val rank: Int) {
     HIGH_CARD(1),
     ONE_PAIR(2),
