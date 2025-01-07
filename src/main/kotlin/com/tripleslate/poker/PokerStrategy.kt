@@ -7,9 +7,11 @@ import kotlin.random.Random
 interface PokerStrategy {
 
     fun executeTurn(
-        game: ReadOnlyPokerTable,
+        table: ReadOnlyPokerTable,
         environment: PokerStrategyEnvironment
     )
+
+    fun onHandCompleted(table: ReadOnlyPokerTable, summary: PokerTable.RoundSummary) {}
 
     companion object {
         fun alwaysFold() = AlwaysFold
@@ -38,35 +40,35 @@ interface PokerStrategyEnvironment {
 
 object AlwaysCall : PokerStrategy {
 
-    override fun executeTurn(game: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
+    override fun executeTurn(table: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
         environment.call()
     }
 }
 
 object AlwaysCheckOrFold : PokerStrategy {
 
-    override fun executeTurn(game: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
+    override fun executeTurn(table: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
         environment.checkOrFold()
     }
 }
 
 object AlwaysFold : PokerStrategy {
 
-    override fun executeTurn(game: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
+    override fun executeTurn(table: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
         environment.fold()
     }
 }
 
 object AlwaysRaise : PokerStrategy {
 
-    override fun executeTurn(game: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
+    override fun executeTurn(table: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
         environment.raise(amount = 2)
     }
 }
 
 object RandomAction : PokerStrategy {
 
-    override fun executeTurn(game: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
+    override fun executeTurn(table: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
         when (Random.nextInt(4)) {
             0 -> environment.fold()
             1 -> environment.checkOrFold()
@@ -78,18 +80,18 @@ object RandomAction : PokerStrategy {
 
 object GoodPotOdds : PokerStrategy {
 
-    override fun executeTurn(game: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
+    override fun executeTurn(table: ReadOnlyPokerTable, environment: PokerStrategyEnvironment) {
         val monteCarloEquityCalculator = MonteCarloEquityCalculator(100)
 
         val equity = monteCarloEquityCalculator.evaluate(
-            numPlayers = game.activePlayers.size,
-            holeCards = game.holeCardsForPlayer(environment.currentPlayer),
-            communityCards = game.communityCards,
+            numPlayers = table.activePlayers.size,
+            holeCards = table.holeCardsForPlayer(environment.currentPlayer),
+            communityCards = table.communityCards,
         )
 
-        val potSize = game.getPotTotal()
-        val amountToCall = (game.roundBets.maxByOrNull { it.value }?.value ?: 0)
-        - (game.roundBets[environment.currentPlayer] ?: 0)
+        val potSize = table.getPotTotal()
+        val amountToCall = (table.roundBets.maxByOrNull { it.value }?.value ?: 0)
+        - (table.roundBets[environment.currentPlayer] ?: 0)
 
         val potOdds = amountToCall.toFloat() / (potSize + amountToCall).toFloat()
 
@@ -103,7 +105,7 @@ object GoodPotOdds : PokerStrategy {
         if (equity > potOdds) {
             if (amountToCall == 0) {
                 if (Random.nextBoolean()) {
-                    if ((game.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
+                    if ((table.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
                         environment.call()
                         return
                     }
@@ -117,7 +119,7 @@ object GoodPotOdds : PokerStrategy {
                     0 -> environment.call()
                     1 -> environment.raise(amount = 2)
                     2 -> {
-                        if ((game.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
+                        if ((table.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
                             environment.call()
                             return
                         }

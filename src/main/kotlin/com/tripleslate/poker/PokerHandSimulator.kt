@@ -57,7 +57,11 @@ class PokerHandSimulator(
             strategy.executeTurn(readOnlyPokerTable, env)
         }
 
-        return turnBasedPokerTable.concludeRound()
+        return turnBasedPokerTable.concludeRound().also { roundSummary ->
+            players.forEach {
+                it.value.onHandCompleted(readOnlyPokerTable, roundSummary)
+            }
+        }
     }
 
 }

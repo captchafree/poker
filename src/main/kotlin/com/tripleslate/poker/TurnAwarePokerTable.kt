@@ -118,9 +118,15 @@ class TurnAwarePokerTable(
 
     // Move to the next player, ensuring the betting round continues correctly
     private fun moveToNextPlayer() {
+        // handle only a single player remaining
+        if (activePlayers.size == 1) {
+            currentPhase = Phase.RIVER
+            isRoundActive = false
+            return
+        }
+
         // Check if the betting round is over
         if (isBettingRoundComplete()) {
-
             // Transition to the next phase of the game
             when (currentPhase) {
                 Phase.PREFLOP -> {

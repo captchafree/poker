@@ -8,7 +8,8 @@ fun main(args: Array<String>) {
     val playerStrategies = mapOf(
         player1 to PokerStrategy.useGoodPotOdds(),
         player2 to PokerStrategy.useGoodPotOdds(),
-        player3 to PokerStrategy.useGoodPotOdds(),
+        // player3 to PokerStrategy.useGoodPotOdds(),
+        player3 to QLearningPokerStrategy(),
     )
 
     val evaluator = MonteCarloPokerStrategyEvaluator(

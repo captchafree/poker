@@ -71,6 +71,7 @@ interface PokerTable {
     data class RoundSummary(
         val communityCards: List<Card>,
         val holeCards: Map<Player, List<Card>>,
+        val foldedPlayers: Set<Player>,
         val playerBets: Map<Player, Int>,
         val totalPotSize: Int,
         val winners: Set<Player>,
@@ -333,7 +334,12 @@ class PokerTableImpl : PokerTable {
     }
 
     override fun concludeRound(): RoundSummary {
-        val winners = computeWinners()
+        val winners = if (activePlayers.size == 1) {
+            setOf(activePlayers.single())
+        } else {
+            computeWinners()
+        }
+
         val potTotal = getPotTotal()
 
         // award funds to winners
@@ -350,6 +356,7 @@ class PokerTableImpl : PokerTable {
                 it.getTotalPotBetOrZero()
             },
             totalPotSize = getPotTotal(),
+            foldedPlayers = (players - activePlayers).toSet(),
             winners = winners.toSet()
         ).also {
             this.reset()
