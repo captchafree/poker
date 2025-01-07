@@ -15,6 +15,9 @@ enum class HandRank(val rank: Int) {
 
 object HandRankUtils {
 
+    /**
+     * Compares the strengths of hands, including tie-breakers
+     */
     fun handComparator(): Comparator<List<Card>> {
         return object : Comparator<List<Card>> {
             override fun compare(

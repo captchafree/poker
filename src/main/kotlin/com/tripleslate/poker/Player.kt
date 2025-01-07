@@ -8,7 +8,6 @@ interface Player {
     fun removeAmountFromBankroll(amount: Float)
 }
 
-
 data class DefaultPlayer(
     override val id: Int,
     override var bankroll: Float = 1000f

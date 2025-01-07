@@ -1,6 +1,6 @@
 package com.tripleslate.poker
 
-import com.tripleslate.poker.PokerTableImpl.RoundSummary
+import com.tripleslate.poker.PokerTable.RoundSummary
 import java.util.*
 
 interface PokerTable {
@@ -67,6 +67,14 @@ interface PokerTable {
     fun advanceDealerPosition()
 
     fun concludeRound(): RoundSummary
+
+    data class RoundSummary(
+        val communityCards: List<Card>,
+        val holeCards: Map<Player, List<Card>>,
+        val playerBets: Map<Player, Int>,
+        val totalPotSize: Int,
+        val winners: Set<Player>,
+    )
 }
 
 class PokerTableImpl : PokerTable {
@@ -355,12 +363,4 @@ class PokerTableImpl : PokerTable {
         roundBets.clear()
         communityCards.clear()
     }
-
-    data class RoundSummary(
-        val communityCards: List<Card>,
-        val holeCards: Map<Player, List<Card>>,
-        val playerBets: Map<Player, Int>,
-        val totalPotSize: Int,
-        val winners: Set<Player>,
-    )
 }

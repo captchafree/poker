@@ -25,9 +25,7 @@ class MonteCarloEquityCalculator(
                 DefaultPlayer(it)
             }
 
-            for (i in 0 until numPlayers) {
-                pokerTable.addPlayer(DefaultPlayer(i))
-            }
+            pokerTable.addPlayers(players)
 
             pokerTable.startNewHandWithSeed(
                 fixedHoleCards = mapOf(players.first() to holeCards),

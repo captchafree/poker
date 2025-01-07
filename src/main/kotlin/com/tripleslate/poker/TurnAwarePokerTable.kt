@@ -1,7 +1,8 @@
 package com.tripleslate.poker
 
-import com.tripleslate.poker.PokerTableImpl.RoundSummary
-
+/**
+ * A decorated PokerTable that tracks who is next to act and manages the lifecycle of hands
+ */
 class TurnAwarePokerTable(
     private val pokerTable: PokerTable,
 ) : PokerTable by pokerTable {
@@ -186,7 +187,7 @@ class TurnAwarePokerTable(
         return river
     }
 
-    override fun concludeRound(): RoundSummary {
+    override fun concludeRound(): PokerTable.RoundSummary {
         isRoundActive = false
 
         val roundSummary = pokerTable.concludeRound()

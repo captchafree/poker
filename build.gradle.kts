@@ -12,7 +12,7 @@ version = "1.0-SNAPSHOT"
 tasks.withType<Jar> {
     manifest {
         attributes(
-            "Main-Class" to "com.tripleslate.poker.MainKt"
+            "Main-Class" to "com.tripleslate.poker.cli.MainKt"
         )
     }
 }
