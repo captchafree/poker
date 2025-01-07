@@ -10,7 +10,7 @@ class PokerSimulator(
 
     fun runSimulation(): PokerTableImpl.RoundSummary {
         val pokerTable = PokerTableImpl()
-        val pokerFacade = PokerGameFacade(pokerTable)
+        val pokerFacade = TurnAwarePokerTable(pokerTable)
 
         for ((player, _) in players) {
             pokerTable.addPlayer(player)
@@ -27,16 +27,16 @@ class PokerSimulator(
                     get() = nextToAct
 
                 override fun fold() {
-                    pokerFacade.playerAction(nextToAct, PokerGameFacade.Action.FOLD)
+                    pokerFacade.playerAction(nextToAct, TurnAwarePokerTable.Action.FOLD)
                 }
 
                 override fun check() {
-                    pokerFacade.playerAction(nextToAct, PokerGameFacade.Action.CHECK)
+                    pokerFacade.playerAction(nextToAct, TurnAwarePokerTable.Action.CHECK)
                 }
 
                 override fun checkOrFold() {
                     try {
-                        pokerFacade.playerAction(nextToAct, PokerGameFacade.Action.CHECK)
+                        pokerFacade.playerAction(nextToAct, TurnAwarePokerTable.Action.CHECK)
                     } catch (e: Exception) {
                         // println(e.message)
                         fold()
@@ -45,7 +45,7 @@ class PokerSimulator(
 
                 override fun call() {
                     try {
-                        pokerFacade.playerAction(nextToAct, PokerGameFacade.Action.CALL)
+                        pokerFacade.playerAction(nextToAct, TurnAwarePokerTable.Action.CALL)
                     } catch (e: Exception) {
                         // println(e.message)
                         checkOrFold()
@@ -53,7 +53,7 @@ class PokerSimulator(
                 }
 
                 override fun raise(amount: Int) {
-                    pokerFacade.playerAction(nextToAct, PokerGameFacade.Action.RAISE, amount)
+                    pokerFacade.playerAction(nextToAct, TurnAwarePokerTable.Action.RAISE, amount)
                 }
             }
 
@@ -73,7 +73,7 @@ class PokerSimulator(
 object AlwaysCall : PokerStrategy {
 
     override fun executeTurn(
-        game: PokerGameFacade,
+        game: TurnAwarePokerTable,
         environment: PokerStrategyEnvironment
     ) {
         environment.call()
@@ -83,7 +83,7 @@ object AlwaysCall : PokerStrategy {
 object AlwaysCheckOrFold : PokerStrategy {
 
     override fun executeTurn(
-        game: PokerGameFacade,
+        game: TurnAwarePokerTable,
         environment: PokerStrategyEnvironment
     ) {
         environment.checkOrFold()
@@ -93,7 +93,7 @@ object AlwaysCheckOrFold : PokerStrategy {
 object AlwaysFold : PokerStrategy {
 
     override fun executeTurn(
-        game: PokerGameFacade,
+        game: TurnAwarePokerTable,
         environment: PokerStrategyEnvironment
     ) {
         environment.fold()
@@ -103,7 +103,7 @@ object AlwaysFold : PokerStrategy {
 object AlwaysRaise : PokerStrategy {
 
     override fun executeTurn(
-        game: PokerGameFacade,
+        game: TurnAwarePokerTable,
         environment: PokerStrategyEnvironment
     ) {
         environment.raise(amount = 2)
@@ -113,7 +113,7 @@ object AlwaysRaise : PokerStrategy {
 object RandomAction : PokerStrategy {
 
     override fun executeTurn(
-        game: PokerGameFacade,
+        game: TurnAwarePokerTable,
         environment: PokerStrategyEnvironment
     ) {
         when (Random.nextInt(4)) {
@@ -128,20 +128,20 @@ object RandomAction : PokerStrategy {
 object GoodPotOdds : PokerStrategy {
 
     override fun executeTurn(
-        game: PokerGameFacade,
+        game: TurnAwarePokerTable,
         environment: PokerStrategyEnvironment
     ) {
         val monteCarloEquityCalculator = MonteCarloEquityCalculator(100)
 
         val equity = monteCarloEquityCalculator.evaluate(
-            numPlayers = game.getActivePlayers().size,
+            numPlayers = game.activePlayers.size,
             holeCards = game.holeCardsForPlayer(environment.currentPlayer),
-            communityCards = game.getCommunityCards(),
+            communityCards = game.communityCards,
         )
 
         val potSize = game.getPotTotal()
-        val amountToCall = (game.underlyingGame.roundBets.maxByOrNull { it.value }?.value ?: 0)
-                            - (game.underlyingGame.roundBets[environment.currentPlayer] ?: 0)
+        val amountToCall = (game.roundBets.maxByOrNull { it.value }?.value ?: 0)
+                            - (game.roundBets[environment.currentPlayer] ?: 0)
 
         val potOdds = amountToCall.toFloat() / (potSize + amountToCall).toFloat()
 
@@ -155,7 +155,7 @@ object GoodPotOdds : PokerStrategy {
         if (equity > potOdds) {
             if (amountToCall == 0) {
                 if (Random.nextBoolean()) {
-                    if ((game.underlyingGame.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
+                    if ((game.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
                         environment.call()
                         return
                     }
@@ -169,7 +169,7 @@ object GoodPotOdds : PokerStrategy {
                     0 -> environment.call()
                     1 -> environment.raise(amount = 2)
                     2 -> {
-                        if ((game.underlyingGame.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
+                        if ((game.roundBets[environment.currentPlayer] ?: 0) >= (environment.currentPlayer.bankroll * 0.05)) {
                             environment.call()
                             return
                         }

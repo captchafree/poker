@@ -42,7 +42,7 @@ class PokerTableTests : FunSpec() {
 
             table.dealHoleCards()
 
-            table.holeCardsMap.size shouldBe 2
+            table.holeCards.size shouldBe 2
             table.holeCardsForPlayer(player1).size shouldBe 2
             table.holeCardsForPlayer(player2).size shouldBe 2
         }
@@ -139,10 +139,10 @@ class PokerTableTests : FunSpec() {
             table.dealFlop()
             table.communityCards.size shouldBe 3
 
-            table.dealTurnOrRiver()
+            table.dealTurn()
             table.communityCards.size shouldBe 4
 
-            table.dealTurnOrRiver()
+            table.dealRiver()
             table.communityCards.size shouldBe 5
         }
 
@@ -175,7 +175,7 @@ class PokerTableTests : FunSpec() {
             winners.size shouldBe 1
             winners.contains(player0) shouldBe true
 
-            for ((player, cards) in table.holeCardsMap) {
+            for ((player, cards) in table.holeCards) {
                 fixedHoleCards[player] shouldContainExactly cards
             }
         }
@@ -208,14 +208,14 @@ class PokerTableTests : FunSpec() {
             table.check(player1)
 
             // Turn phase
-            table.dealTurnOrRiver()
+            table.dealTurn()
             table.check(player2)
             table.check(player3)
             table.check(player4)
             table.check(player1)
 
             // River phase
-            table.dealTurnOrRiver()
+            table.dealRiver()
             table.check(player2)
             table.check(player3)
             table.check(player4)
@@ -259,7 +259,7 @@ class PokerTableTests : FunSpec() {
             table.getPotTotal() shouldBe 90
 
             // Turn phase
-            table.dealTurnOrRiver()
+            table.dealTurn()
             table.check(player3)
             table.raise(player4, 10)
             table.raise(player3, 10)
@@ -268,7 +268,7 @@ class PokerTableTests : FunSpec() {
             table.getPotTotal() shouldBe 130
 
             // River phase
-            table.dealTurnOrRiver()
+            table.dealRiver()
             table.check(player3)
             table.raise(player4, 20)
             table.call(player3)

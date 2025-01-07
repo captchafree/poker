@@ -5,18 +5,33 @@ import java.util.*
 
 interface PokerTable {
 
+    /**
+     * The players at the table
+     */
     val players: List<Player>
     val numPlayers: Int
 
+    /**
+     * Players still in the hand. they haven't folded
+     */
     val activePlayers: List<Player>
 
     val pot: Map<Player, Int>
 
+    /**
+     * player -> bets in the current round (preflop, flop, etc)
+     */
     val roundBets: Map<Player, Int>
 
+    /**
+     * Index of the dealer
+     */
     val dealerIndex: Int
-    val holeCardsMap: Map<Player, List<Card>>
 
+    /**
+     * player -> hole cards
+     */
+    val holeCards: Map<Player, List<Card>>
     val communityCards: List<Card>
 
     fun addPlayer(player: Player)
@@ -33,18 +48,22 @@ interface PokerTable {
     )
 
     fun dealHoleCards()
+    fun postBlinds(smallBlind: Int, bigBlind: Int)
 
     fun holeCardsForPlayer(player: Player): List<Card>
 
     fun dealFlop(): List<Card>
-    fun dealTurnOrRiver(): Card
-    fun postBlinds(smallBlind: Int, bigBlind: Int)
+    fun dealTurn(): Card
+    fun dealRiver(): Card
 
     fun fold(player: Player)
     fun call(player: Player)
     fun raise(player: Player, amount: Int)
     fun check(player: Player)
 
+    /**
+     * Move the dealer position to the left by one
+     */
     fun advanceDealerPosition()
 
     fun concludeRound(): RoundSummary
@@ -56,7 +75,7 @@ class PokerTableImpl : PokerTable {
     override val numPlayers: Int
         get() = players.size
 
-    override var activePlayers: MutableList<Player> = players.toMutableList()
+    override var activePlayers: MutableList<Player> = mutableListOf()
 
     private var deck: CardDeck = CardDeck.newStandardDeck().apply { shuffle() }
 
@@ -67,15 +86,16 @@ class PokerTableImpl : PokerTable {
 
     override var dealerIndex: Int = 0
 
-    override val holeCardsMap: MutableMap<Player, MutableList<Card>> = mutableMapOf()
+    override val holeCards: MutableMap<Player, MutableList<Card>> = mutableMapOf()
     override val communityCards: MutableList<Card> = mutableListOf()
+
 
     override fun addPlayers(players: Collection<Player>) {
         players.forEach(::addPlayer)
     }
 
     override fun addPlayer(player: Player) {
-        require(holeCardsMap.isEmpty()) {
+        require(holeCards.isEmpty()) {
             "Cannot add a player in the middle of a hand"
         }
 
@@ -89,7 +109,7 @@ class PokerTableImpl : PokerTable {
     }
 
     override fun removePlayer(player: Player) {
-        require(holeCardsMap.isEmpty()) {
+        require(holeCards.isEmpty()) {
             "Cannot add a player in the middle of a hand"
         }
 
@@ -106,7 +126,7 @@ class PokerTableImpl : PokerTable {
 
         deck = CardDeck.newStandardDeck()
         deck.shuffle()
-        holeCardsMap.clear()
+        holeCards.clear()
         activePlayers = players.toMutableList()
 
         // remove provided cards so they can't appear twice
@@ -120,13 +140,13 @@ class PokerTableImpl : PokerTable {
         }
 
         for (i in 0 until players.size) {
-            holeCardsMap.computeIfAbsent(players[i]) {
+            holeCards.computeIfAbsent(players[i]) {
                 fixedHoleCards[it]?.toMutableList() ?: mutableListOf()
             }
         }
 
         for (i in 0 + dealerIndex until (players.size * 2) + dealerIndex) {
-            val currHoleCards = holeCardsMap.computeIfAbsent(players[i % players.size]) { mutableListOf() }
+            val currHoleCards = holeCards.computeIfAbsent(players[i % players.size]) { mutableListOf() }
 
             if (currHoleCards.size < 2) {
                 currHoleCards.add(deck.dealCard())
@@ -140,7 +160,7 @@ class PokerTableImpl : PokerTable {
     }
 
     override fun holeCardsForPlayer(player: Player): List<Card> {
-        return holeCardsMap[player] ?:
+        return holeCards[player] ?:
             error("Missing player $player")
     }
 
@@ -156,13 +176,13 @@ class PokerTableImpl : PokerTable {
             "Cannot deal cards with less than 2 active players."
         }
 
-        holeCardsMap.clear()
+        holeCards.clear()
 
         for (i in 0 until players.size) {
-            holeCardsMap.computeIfAbsent(players[i]) { mutableListOf() }
+            holeCards.computeIfAbsent(players[i]) { mutableListOf() }
         }
         for (i in 0 + dealerIndex until (players.size * 2) + dealerIndex) {
-            val currHoleCards = holeCardsMap[players[i % players.size]]!!
+            val currHoleCards = holeCards[players[i % players.size]]!!
 
             if (currHoleCards.size < 2) {
                 currHoleCards.add(deck.dealCard())
@@ -180,7 +200,15 @@ class PokerTableImpl : PokerTable {
         }
     }
 
-    override fun dealTurnOrRiver(): Card {
+    override fun dealTurn(): Card {
+        return dealTurnOrRiver()
+    }
+
+    override fun dealRiver(): Card {
+        return dealTurnOrRiver()
+    }
+
+    private fun dealTurnOrRiver(): Card {
         deck.dealCard() // Burn one card
         return deck.dealCard().also {
             communityCards.add(it)
@@ -309,7 +337,7 @@ class PokerTableImpl : PokerTable {
 
         return RoundSummary(
             communityCards = communityCards.map { it },
-            holeCards = Collections.unmodifiableMap(holeCardsMap.map { it.key to it.value }.toMap()),
+            holeCards = Collections.unmodifiableMap(holeCards.map { it.key to it.value }.toMap()),
             playerBets = players.associateWith {
                 it.getTotalPotBetOrZero()
             },
@@ -322,7 +350,7 @@ class PokerTableImpl : PokerTable {
 
     private fun reset() {
         currentBet = 0
-        holeCardsMap.clear()
+        holeCards.clear()
         pot.clear()
         roundBets.clear()
         communityCards.clear()
@@ -335,79 +363,4 @@ class PokerTableImpl : PokerTable {
         val totalPotSize: Int,
         val winners: Set<Player>,
     )
-}
-
-interface Player {
-    val id: Int
-    val bankroll: Float
-
-    fun addAmountToBankroll(amount: Float)
-    fun removeAmountFromBankroll(amount: Float)
-}
-
-data class DefaultPlayer(
-    override val id: Int,
-    override var bankroll: Float = 1000f
-): Player {
-
-    override fun addAmountToBankroll(amount: Float) {
-        bankroll += amount
-    }
-
-    override fun removeAmountFromBankroll(amount: Float) {
-        require(amount >= amount) {
-            "Player has insufficient funds!"
-        }
-
-        bankroll -= amount
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is DefaultPlayer) return false
-
-        if (id != other.id) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        return id
-    }
-}
-
-
-// Example Usage
-fun main() {
-    val game = PokerTableImpl()
-
-    // 4 players
-    game.addPlayer(DefaultPlayer(0))
-    game.addPlayer(DefaultPlayer(1))
-    game.addPlayer(DefaultPlayer(2))
-    game.addPlayer(DefaultPlayer(3))
-
-    game.dealHoleCards() // Deal hole cards to players
-    game.postBlinds(1, 2)
-
-    println("Pot total: ${game.getPotTotal()}")
-
-    game.call(DefaultPlayer(4))
-    game.call(DefaultPlayer(1))
-    game.call(DefaultPlayer(2))
-    game.check(DefaultPlayer(3))
-
-    println("Pot total: ${game.getPotTotal()}")
-
-
-    val flop = game.dealFlop() // Deal the flop
-    println("Flop: $flop")
-
-    val turn = game.dealTurnOrRiver() // Deal the turn
-    println("Turn: $turn")
-
-    val river = game.dealTurnOrRiver() // Deal the river
-    println("River: $river")
-
-    println("Pot total: ${game.getPotTotal()}")
 }

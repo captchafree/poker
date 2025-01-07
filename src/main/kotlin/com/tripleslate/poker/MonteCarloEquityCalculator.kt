@@ -37,8 +37,10 @@ class MonteCarloEquityCalculator(
             while (pokerTable.communityCards.size < 5) {
                 if (pokerTable.communityCards.isEmpty()) {
                     pokerTable.dealFlop()
+                } else if (pokerTable.communityCards.size == 3){
+                    pokerTable.dealTurn()
                 } else {
-                    pokerTable.dealTurnOrRiver()
+                    pokerTable.dealRiver()
                 }
             }
 

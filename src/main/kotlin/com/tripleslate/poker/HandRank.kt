@@ -151,7 +151,7 @@ object HandRankUtils {
         // Get the best 5 cards for a Full House
         val sortedCards = cards.sortedByDescending { it.value.ordinal }
         val grouped = sortedCards.groupBy { it.value }
-        val counts = grouped.map { it.value.size }.sorted()
+        val counts = grouped.map { it.value.size }.sortedDescending()
         return counts == listOf(3, 2) // Check if there's a triplet and a pair
     }
 
@@ -165,10 +165,23 @@ object HandRankUtils {
 
     private fun isStraight(cards: List<Card>): Boolean {
         val sortedCards = cards.sortedByDescending { it.value.ordinal }
-        val values = sortedCards.map { it.value.ordinal }
+        val values = sortedCards.map { it.value.ordinal }.distinct()
 
-        // Check for a straight (consecutive sequence)
-        return values.zipWithNext().all { it.first - it.second == 1 }
+        // Check for a consecutive sequence
+        if (values.zipWithNext().all { it.first - it.second == 1 }) {
+            return true
+        }
+
+        // Check for ace low straight (Ace, 2, 3, 4, 5)
+        val aceLowStraight = listOf(
+            CardValue.ACE.ordinal,
+            CardValue.TWO.ordinal,
+            CardValue.THREE.ordinal,
+            CardValue.FOUR.ordinal,
+            CardValue.FIVE.ordinal
+        )
+
+        return values.containsAll(aceLowStraight)
     }
 
     private fun isThreeOfAKind(cards: List<Card>): Boolean {

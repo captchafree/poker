@@ -38,7 +38,7 @@ class HandEquityCalculator {
             return
         }
 
-        communityCards + parseCards(content)
+        communityCards += parseCards(content)
     }
 
     fun setNumOpponents(numOpponents: Int) {

@@ -16,7 +16,7 @@ fun main(args: Array<String>) {
 
     println(calculator.computeCurrentEquity())
 
-    return
+    // return
 
     PokerCLI().main(args)
 }
