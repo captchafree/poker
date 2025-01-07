@@ -1,6 +1,5 @@
 package com.tripleslate.poker
 
-import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.random.Random
@@ -9,12 +8,12 @@ class PokerSimulator(
     private val players: Map<out Player, PokerStrategy>
 ) {
 
-    fun runSimulation(): PokerGame.RoundSummary {
-        val pokerGame = PokerGame()
-        val pokerFacade = PokerGameFacade(pokerGame)
+    fun runSimulation(): PokerTableImpl.RoundSummary {
+        val pokerTable = PokerTableImpl()
+        val pokerFacade = PokerGameFacade(pokerTable)
 
         for ((player, _) in players) {
-            pokerGame.addPlayer(player)
+            pokerTable.addPlayer(player)
         }
 
         pokerFacade.startNewHand()
@@ -178,11 +177,11 @@ object GoodPotOdds : PokerStrategy {
                         val randomPart = Random.nextInt(1, 4)
 
                         val raiseAmount = ceil(Random.nextInt(1, 2) * equity * potSize).toInt()
-                        println("[$equity] [$potSize] [$randomPart] = $raiseAmount")
+                        // println("[$equity] [$potSize] [$randomPart] = $raiseAmount")
 
-                        for (e in game.underlyingGame.pot) {
-                            println("${e.key}: ${e.value}")
-                        }
+//                        for (e in game.underlyingGame.pot) {
+//                            println("${e.key}: ${e.value}")
+//                        }
 
                         environment.raise(amount = max(1, 2))
                     }

@@ -19,29 +19,35 @@ class MonteCarloEquityCalculator(
         var numLosses = 0
 
         for (i in 1..numSimulations) {
-            val pokerGame = PokerGame()
+            val pokerTable = PokerTableImpl()
 
-            for (i in 0 until numPlayers) {
-                pokerGame.addPlayer(DefaultPlayer(i))
+            val players = (0 until numPlayers).map {
+                DefaultPlayer(it)
             }
 
-            pokerGame.startNewHandWithSeed(
-                fixedHoleCards = mapOf(0 to holeCards),
+            for (i in 0 until numPlayers) {
+                pokerTable.addPlayer(DefaultPlayer(i))
+            }
+
+            pokerTable.startNewHandWithSeed(
+                fixedHoleCards = mapOf(players.first() to holeCards),
                 communityCards = communityCards,
             )
 
-            while (pokerGame.communityCards.size < 5) {
-                if (pokerGame.communityCards.isEmpty()) {
-                    pokerGame.dealFlop()
+            while (pokerTable.communityCards.size < 5) {
+                if (pokerTable.communityCards.isEmpty()) {
+                    pokerTable.dealFlop()
                 } else {
-                    pokerGame.dealTurnOrRiver()
+                    pokerTable.dealTurnOrRiver()
                 }
             }
 
-            val winnerIndexes = pokerGame.getWinners()
+            val roundSummary = pokerTable.concludeRound()
 
-            if (winnerIndexes.contains(0)) {
-                if (winnerIndexes.size == 1) {
+            val winners = roundSummary.winners
+
+            if (winners.contains(players.first())) {
+                if (winners.size == 1) {
                     numWins++
                 } else {
                     numTies++

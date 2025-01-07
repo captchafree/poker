@@ -1,6 +1,6 @@
 package com.tripleslate.poker
 
-import com.tripleslate.poker.PokerGame.RoundSummary
+import com.tripleslate.poker.PokerTableImpl.RoundSummary
 
 interface PokerStrategy {
 
@@ -22,7 +22,7 @@ interface PokerStrategyEnvironment {
 }
 
 class PokerGameFacade(
-    private val pokerGame: PokerGame,
+    private val pokerTable: PokerTable,
 ) {
 
     private var roundActive: Boolean = false
@@ -40,22 +40,24 @@ class PokerGameFacade(
     }
 
     val underlyingGame
-        get() = pokerGame
+        get() = pokerTable
 
     fun isRoundActive(): Boolean = roundActive
 
     fun getNextToAct(): Player {
-        return pokerGame.players[nextToActIndex]
+        return pokerTable.players[nextToActIndex]
     }
 
     // Start a new hand
     fun startNewHand() {
-        pokerGame.dealHoleCards()
+        pokerTable.dealHoleCards()
+        pokerTable.postBlinds(1, 2)
+
         roundActive = true
         bettingRoundActive = true
         currentPhase = Phase.PREFLOP
 
-        nextToActIndex = (pokerGame.dealerIndex + 3) % pokerGame.numPlayers
+        nextToActIndex = (pokerTable.dealerIndex + 3) % pokerTable.numPlayers
     }
 
     // Proceed with the player's action, ensuring they're not acting out of turn
@@ -68,7 +70,7 @@ class PokerGameFacade(
             throw IllegalStateException("Betting round has concluded. Can't $action")
         }
 
-        val currentPlayer = pokerGame.players[nextToActIndex]
+        val currentPlayer = pokerTable.players[nextToActIndex]
         if (currentPlayer != player) {
             throw IllegalStateException("[$nextToActIndex] It's Player ${currentPlayer.id}'s turn, not Player ${player.id}'s.")
         }
@@ -76,23 +78,22 @@ class PokerGameFacade(
         // Ensure the player makes a valid action
         when (action) {
             Action.FOLD -> {
-                pokerGame.fold(player)
+                pokerTable.fold(player)
             }
             Action.CHECK -> {
-                pokerGame.check(player)
+                pokerTable.check(player)
             }
             Action.CALL -> {
-                pokerGame.call(player)
+                pokerTable.call(player)
             }
             Action.RAISE -> {
-                println("Player ${player.id} raised by $amount")
-                pokerGame.raise(player, amount)
+                pokerTable.raise(player, amount)
             }
         }
 
         if (
             currentPhase == Phase.PREFLOP &&
-            pokerGame.players[(pokerGame.dealerIndex + 2) % pokerGame.numPlayers] == player
+            pokerTable.players[(pokerTable.dealerIndex + 2) % pokerTable.numPlayers] == player
         ) {
             hasReceivedPreFlopActionFromBigBlind = true
         }
@@ -105,16 +106,16 @@ class PokerGameFacade(
         // Conditions for betting round completion:
         // 1. All active players have taken action, and the actions are resolved.
         // 2. No players have raised or there's a call matching the highest bet amount.
-        val highestBet = pokerGame.roundBets.values.maxOrNull()
+        val highestBet = pokerTable.roundBets.values.maxOrNull()
 
         if (currentPhase == Phase.PREFLOP && !hasReceivedPreFlopActionFromBigBlind) {
             return false
         }
 
-        return pokerGame.roundBets.keys.containsAll(pokerGame.activePlayers) && pokerGame.activePlayers.all { player ->
+        return pokerTable.roundBets.keys.containsAll(pokerTable.activePlayers) && pokerTable.activePlayers.all { player ->
             // Each active player has either folded, gone all-in, or matched the highest bet
             player.bankroll <= 0f ||
-            pokerGame.roundBets[player] == highestBet
+            pokerTable.roundBets[player] == highestBet
         }
     }
 
@@ -151,19 +152,19 @@ class PokerGameFacade(
                 }
             }
 
-            nextToActIndex = pokerGame.dealerIndex
+            nextToActIndex = pokerTable.dealerIndex
         }
 
         // Advance to the next active player
         do {
-            nextToActIndex = (nextToActIndex + 1) % pokerGame.numPlayers
-        } while (nextToActIndex !in pokerGame.activePlayers.map { it.id })
+            nextToActIndex = (nextToActIndex + 1) % pokerTable.numPlayers
+        } while (nextToActIndex !in pokerTable.activePlayers.map { it.id })
     }
 
     // Deal the flop and advance to the post-flop phase
     fun dealFlop(): List<Card> {
         require(currentPhase == Phase.PREFLOP) { "Flop can only be dealt after the preflop phase." }
-        val flop = pokerGame.dealFlop()
+        val flop = pokerTable.dealFlop()
         currentPhase = Phase.FLOP
 
         // nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
@@ -175,7 +176,7 @@ class PokerGameFacade(
     // Deal the turn and advance to the post-turn phase
     fun dealTurn(): Card {
         require(currentPhase == Phase.FLOP) { "Turn can only be dealt after the flop." }
-        val turn = pokerGame.dealTurnOrRiver()
+        val turn = pokerTable.dealTurnOrRiver()
         currentPhase = Phase.TURN
 
         // nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
@@ -187,7 +188,7 @@ class PokerGameFacade(
     // Deal the river and advance to the post-river phase
     fun dealRiver(): Card {
         require(currentPhase == Phase.TURN) { "River can only be dealt after the turn." }
-        val river = pokerGame.dealTurnOrRiver()
+        val river = pokerTable.dealTurnOrRiver()
         currentPhase = Phase.RIVER
 
         // nextToActIndex = (pokerGame.dealerIndex) % pokerGame.numPlayers
@@ -214,12 +215,12 @@ class PokerGameFacade(
 
     // Get the total pot value
     fun getPotTotal(): Int {
-        return pokerGame.getPotTotal()
+        return pokerTable.getPotTotal()
     }
 
     // Get a list of active players
     fun getActivePlayers(): List<Player> {
-        return pokerGame.activePlayers
+        return pokerTable.activePlayers
     }
 
     // Check if the current round is over (all players have acted)
@@ -229,25 +230,19 @@ class PokerGameFacade(
 
     // Get the community cards
     fun getCommunityCards(): List<Card> {
-        return pokerGame.communityCards
+        return pokerTable.communityCards
     }
 
     // Get hole cards for a player
     fun holeCardsForPlayer(player: Player): List<Card> {
-        return pokerGame.holeCards[player.id]
-    }
-
-    fun getWinners(): Set<Player> {
-        return pokerGame.getWinners().map { playerId ->
-            getActivePlayers().first { it.id == playerId }
-        }.toSet()
+        return pokerTable.holeCardsForPlayer(player)
     }
 
     fun concludeRound(): RoundSummary {
         roundActive = false
 
-        val roundSummary = pokerGame.concludeRound()
-        pokerGame.nextDealer()
+        val roundSummary = pokerTable.concludeRound()
+        pokerTable.advanceDealerPosition()
         bettingRoundActive = false
         currentPhase = Phase.PREFLOP
         hasReceivedPreFlopActionFromBigBlind = false
@@ -266,29 +261,29 @@ class PokerGameFacade(
 
 // Example Usage
 fun main() {
-    val pokerGame = PokerGame()
+    val pokerTable = PokerTableImpl()
 
     val player3 = DefaultPlayer(3, 6f)
     // 4 players
-    pokerGame.addPlayer(DefaultPlayer(0))
-    pokerGame.addPlayer(DefaultPlayer(1))
-    pokerGame.addPlayer(DefaultPlayer(2))
-    pokerGame.addPlayer(player3)
+    pokerTable.addPlayer(DefaultPlayer(0))
+    pokerTable.addPlayer(DefaultPlayer(1))
+    pokerTable.addPlayer(DefaultPlayer(2))
+    pokerTable.addPlayer(player3)
 
-    val pokerFacade = PokerGameFacade(pokerGame)
+    val pokerFacade = PokerGameFacade(pokerTable)
 
     pokerFacade.startNewHand() // Start a new hand
 
     println("Pot total before actions: ${pokerFacade.getPotTotal()}")
 
 
-    pokerFacade.playerAction(pokerGame.players[3], PokerGameFacade.Action.RAISE, amount = 2)
+    pokerFacade.playerAction(pokerTable.players[3], PokerGameFacade.Action.RAISE, amount = 2)
     println("Pot total 3: ${pokerFacade.getPotTotal()}")
-    pokerFacade.playerAction(pokerGame.players[0], PokerGameFacade.Action.CALL)
+    pokerFacade.playerAction(pokerTable.players[0], PokerGameFacade.Action.CALL)
     println("Pot total 0: ${pokerFacade.getPotTotal()}")
-    pokerFacade.playerAction(pokerGame.players[1], PokerGameFacade.Action.FOLD)
+    pokerFacade.playerAction(pokerTable.players[1], PokerGameFacade.Action.FOLD)
     println("Pot total 1: ${pokerFacade.getPotTotal()}")
-    pokerFacade.playerAction(pokerGame.players[2], PokerGameFacade.Action.CALL)
+    pokerFacade.playerAction(pokerTable.players[2], PokerGameFacade.Action.CALL)
     println("Pot total 2: ${pokerFacade.getPotTotal()}")
 
     println("Pot total after actions: ${pokerFacade.getPotTotal()}")
@@ -296,16 +291,16 @@ fun main() {
     val flop = pokerFacade.dealFlop()
     println("Flop: $flop")
 
-    pokerFacade.playerAction(pokerGame.players[2], PokerGameFacade.Action.CHECK)
-    pokerFacade.playerAction(pokerGame.players[3], PokerGameFacade.Action.CHECK)
-    pokerFacade.playerAction(pokerGame.players[0], PokerGameFacade.Action.CHECK)
+    pokerFacade.playerAction(pokerTable.players[2], PokerGameFacade.Action.CHECK)
+    pokerFacade.playerAction(pokerTable.players[3], PokerGameFacade.Action.CHECK)
+    pokerFacade.playerAction(pokerTable.players[0], PokerGameFacade.Action.CHECK)
 
     val turn = pokerFacade.dealTurn()
     println("Turn: $turn")
 
-    pokerFacade.playerAction(pokerGame.players[2], PokerGameFacade.Action.RAISE, 2)
-    pokerFacade.playerAction(pokerGame.players[3], PokerGameFacade.Action.CALL)
-    pokerFacade.playerAction(pokerGame.players[0], PokerGameFacade.Action.FOLD)
+    pokerFacade.playerAction(pokerTable.players[2], PokerGameFacade.Action.RAISE, 2)
+    pokerFacade.playerAction(pokerTable.players[3], PokerGameFacade.Action.CALL)
+    pokerFacade.playerAction(pokerTable.players[0], PokerGameFacade.Action.FOLD)
 
     val river = pokerFacade.dealRiver()
     println("River: $river")
@@ -316,7 +311,7 @@ fun main() {
         println("[${it.id}] ${pokerFacade.holeCardsForPlayer(it)}")
     }
 
-    println(pokerGame.concludeRound())
+    println(pokerTable.concludeRound())
 
     val communityCards = listOf(
         // Card(CardValue.ACE, CardSuit.SPADES),
