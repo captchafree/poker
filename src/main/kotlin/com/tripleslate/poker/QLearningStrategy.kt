@@ -4,7 +4,9 @@ import java.io.*
 import kotlin.math.ln
 import kotlin.random.Random
 
-class QLearningPokerStrategy : PokerStrategy {
+class QLearningPokerStrategy(
+    private val qtableFile: File? = null,
+) : PokerStrategy {
 
     private var qTable: HashMap<StateActionPair, Double> = HashMap()
     private val learningRate = 0.8
@@ -14,10 +16,12 @@ class QLearningPokerStrategy : PokerStrategy {
     private var itrCount = 0
 
     init {
-        FileInputStream(File("/Users/joshbeck/Desktop/poker/qtable")).use { fileInputStream ->
-            ObjectInputStream(fileInputStream).use { objectInputStream ->
-                qTable = objectInputStream.readObject() as HashMap<StateActionPair, Double>
-                println(qTable.size)
+        if (qtableFile != null) {
+            FileInputStream(qtableFile).use { fileInputStream ->
+                ObjectInputStream(fileInputStream).use { objectInputStream ->
+                    qTable = objectInputStream.readObject() as HashMap<StateActionPair, Double>
+                    println(qTable.size)
+                }
             }
         }
     }
@@ -95,9 +99,11 @@ class QLearningPokerStrategy : PokerStrategy {
         }
 
         if (++itrCount % 100 == 0) {
-            FileOutputStream("/Users/joshbeck/Desktop/poker/qtable").use { fileOutputStream ->
-                ObjectOutputStream(fileOutputStream).use { objectOutputStream ->
-                    objectOutputStream.writeObject(qTable)
+            if (qtableFile != null) {
+                FileOutputStream(qtableFile).use { fileOutputStream ->
+                    ObjectOutputStream(fileOutputStream).use { objectOutputStream ->
+                        objectOutputStream.writeObject(qTable)
+                    }
                 }
             }
         }

@@ -1,5 +1,7 @@
 package com.tripleslate.poker
 
+import java.io.File
+
 fun main(args: Array<String>) {
     val player1 = DefaultPlayer(0, bankroll = 1_000_000f)
     val player2 = DefaultPlayer(1, bankroll = 1_000_000f)
@@ -9,7 +11,9 @@ fun main(args: Array<String>) {
         player1 to PokerStrategy.useGoodPotOdds(),
         player2 to PokerStrategy.useGoodPotOdds(),
         // player3 to PokerStrategy.useGoodPotOdds(),
-        player3 to QLearningPokerStrategy(),
+        player3 to QLearningPokerStrategy(
+            qtableFile = File("/Users/joshbeck/Desktop/poker/qtable")
+        ),
     )
 
     val evaluator = MonteCarloPokerStrategyEvaluator(
