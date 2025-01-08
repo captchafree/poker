@@ -30,15 +30,16 @@ class MonteCarloEquityCalculator(
             pokerTable.startNewHandWithSeed(
                 fixedHoleCards = mapOf(players.first() to holeCards),
                 communityCards = communityCards,
+                numCardsToDealPerPlayer = 2
             )
 
             while (pokerTable.communityCards.size < 5) {
                 if (pokerTable.communityCards.isEmpty()) {
-                    pokerTable.dealFlop()
+                    pokerTable.dealCommunityCards(amount = 3)
                 } else if (pokerTable.communityCards.size == 3){
-                    pokerTable.dealTurn()
+                    pokerTable.dealCommunityCards(amount = 1)
                 } else {
-                    pokerTable.dealRiver()
+                    pokerTable.dealCommunityCards(amount = 1)
                 }
             }
 

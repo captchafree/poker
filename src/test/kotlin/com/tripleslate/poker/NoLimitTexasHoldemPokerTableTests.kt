@@ -1,9 +1,10 @@
 package com.tripleslate.poker
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 
-class TurnAwarePokerTableTest : FunSpec() {
+class NoLimitTexasHoldemPokerTableTests : FunSpec() {
 
     init {
         test("should set nextToActIndex correctly at the start of a new hand") {
@@ -15,7 +16,7 @@ class TurnAwarePokerTableTest : FunSpec() {
             )
             val pokerTable = PokerTableImpl()
             pokerTable.addPlayers(players)
-            val table = TurnAwarePokerTable(pokerTable)
+            val table = NoLimitTexasHoldemPokerTableImpl(pokerTable)
 
             table.startNewHand()
 
@@ -31,14 +32,14 @@ class TurnAwarePokerTableTest : FunSpec() {
             )
             val pokerTable = PokerTableImpl()
             pokerTable.addPlayers(players)
-            val table = TurnAwarePokerTable(pokerTable)
+            val table = NoLimitTexasHoldemPokerTableImpl(pokerTable)
 
             table.startNewHand()
 
             val initialDefaultPlayer = table.getNextToAct()
             initialDefaultPlayer.id shouldBe 4
 
-            table.playerAction(initialDefaultPlayer, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(initialDefaultPlayer, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             table.getNextToAct().id shouldBe 1
         }
@@ -52,18 +53,18 @@ class TurnAwarePokerTableTest : FunSpec() {
             )
             val pokerTable = PokerTableImpl()
             pokerTable.addPlayers(players)
-            val table = TurnAwarePokerTable(pokerTable)
+            val table = NoLimitTexasHoldemPokerTableImpl(pokerTable)
 
             table.startNewHand()
 
             val player4 = table.getNextToAct()
-            table.playerAction(player4, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(player4, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             val player1 = table.getNextToAct()
-            table.playerAction(player1, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(player1, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             val player2 = table.getNextToAct()
-            table.playerAction(player2, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(player2, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             val player3 = table.getNextToAct()
             player3.id shouldBe 3
@@ -78,23 +79,23 @@ class TurnAwarePokerTableTest : FunSpec() {
             )
             val pokerTable = PokerTableImpl()
             pokerTable.addPlayers(players)
-            val table = TurnAwarePokerTable(pokerTable)
+            val table = NoLimitTexasHoldemPokerTableImpl(pokerTable)
 
             table.startNewHand()
 
             val player4 = table.getNextToAct()
-            table.playerAction(player4, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(player4, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             val player1 = table.getNextToAct()
-            table.playerAction(player1, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(player1, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             val player2 = table.getNextToAct()
-            table.playerAction(player2, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(player2, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             val player3 = table.getNextToAct()
-            table.playerAction(player3, TurnAwarePokerTable.Action.CHECK)
+            table.playerAction(player3, NoLimitTexasHoldemPokerTableImpl.Action.CHECK)
 
-            table.dealFlop()
+            // flop is dealt
 
             table.getNextToAct().id shouldBe 2 // Assuming first to act is next to the dealer.
         }
@@ -108,28 +109,43 @@ class TurnAwarePokerTableTest : FunSpec() {
             )
             val pokerTable = PokerTableImpl()
             pokerTable.addPlayers(players)
-            val table = TurnAwarePokerTable(pokerTable)
+            val table = NoLimitTexasHoldemPokerTableImpl(pokerTable)
 
             table.startNewHand()
 
             val player4 = table.getNextToAct()
-            table.playerAction(player4, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(player4, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             val player1 = table.getNextToAct()
-            table.playerAction(player1, TurnAwarePokerTable.Action.CALL)
+            table.playerAction(player1, NoLimitTexasHoldemPokerTableImpl.Action.CALL)
 
             val player2 = table.getNextToAct()
-            table.playerAction(player2, TurnAwarePokerTable.Action.FOLD)
+            table.playerAction(player2, NoLimitTexasHoldemPokerTableImpl.Action.FOLD)
 
             val player3 = table.getNextToAct()
-            table.playerAction(player3, TurnAwarePokerTable.Action.CHECK)
+            table.playerAction(player3, NoLimitTexasHoldemPokerTableImpl.Action.CHECK)
 
-            table.dealFlop()
+            // flop is dealt
 
             table.getNextToAct() shouldBe player3
-            table.playerAction(player3, TurnAwarePokerTable.Action.CHECK)
+            table.playerAction(player3, NoLimitTexasHoldemPokerTableImpl.Action.CHECK)
 
             table.getNextToAct() shouldBe player4
+        }
+
+        test("should not allow adding players during an active hand") {
+            val table = PokerTableImpl()
+            val texasHoldemPokerTable = NoLimitTexasHoldemPokerTableImpl(table)
+            texasHoldemPokerTable.addPlayer(DefaultPlayer(0))
+
+            texasHoldemPokerTable.addPlayer(DefaultPlayer(0))
+            texasHoldemPokerTable.addPlayer(DefaultPlayer(1))
+
+            texasHoldemPokerTable.startNewHandWithSeed(emptyMap(), emptyList())
+
+            shouldThrow<IllegalArgumentException> {
+                texasHoldemPokerTable.addPlayer(DefaultPlayer(2))
+            }
         }
     }
 }

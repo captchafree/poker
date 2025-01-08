@@ -17,6 +17,6 @@ data class PokerTableRules(
 }
 
 data class Blinds(
-    val bigBlindAmount: Int,
     val smallBlindAmount: Int,
+    val bigBlindAmount: Int,
 )

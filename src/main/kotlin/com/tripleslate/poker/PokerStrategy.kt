@@ -89,7 +89,7 @@ object GoodPotOdds : PokerStrategy {
             communityCards = table.communityCards,
         )
 
-        val potSize = table.getPotTotal()
+        val potSize = table.getPotSize()
         val amountToCall = (table.roundBets.maxByOrNull { it.value }?.value ?: 0)
         - (table.roundBets[environment.currentPlayer] ?: 0)
 

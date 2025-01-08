@@ -33,19 +33,19 @@ class QLearningPokerStrategy : PokerStrategy {
             "check" -> environment.checkOrFold()
             "call" -> environment.call()
             "raise" -> {
-                val raiseAmount = (table.getPotTotal() * 0.15).toInt().coerceAtLeast(2)
+                val raiseAmount = (table.getPotSize() * 0.15).toInt().coerceAtLeast(2)
                 environment.raise(raiseAmount)
             }
             "raise2" -> {
-                val raiseAmount = (table.getPotTotal() * 0.35).toInt().coerceAtLeast(4)
+                val raiseAmount = (table.getPotSize() * 0.35).toInt().coerceAtLeast(4)
                 environment.raise(raiseAmount)
             }
             "raise4" -> {
-                val raiseAmount = (table.getPotTotal() * 0.5).toInt().coerceAtLeast(8)
+                val raiseAmount = (table.getPotSize() * 0.5).toInt().coerceAtLeast(8)
                 environment.raise(raiseAmount)
             }
             "raise8" -> {
-                val raiseAmount = (table.getPotTotal() * 0.75).toInt().coerceAtLeast(16)
+                val raiseAmount = (table.getPotSize() * 0.75).toInt().coerceAtLeast(16)
                 environment.raise(raiseAmount)
             }
         }
@@ -115,7 +115,7 @@ class QLearningPokerStrategy : PokerStrategy {
             communityCards = table.communityCards,
         )
 
-        val potSize = table.getPotTotal()
+        val potSize = table.getPotSize()
         val amountToCall = (table.roundBets.maxByOrNull { it.value }?.value ?: 0)
         - (table.roundBets[environment.currentPlayer] ?: 0)
 

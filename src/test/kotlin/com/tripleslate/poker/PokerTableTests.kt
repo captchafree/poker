@@ -22,17 +22,6 @@ class PokerTableTests : FunSpec() {
             table.numPlayers shouldBe 2
         }
 
-        test("should not allow adding players during an active hand") {
-            table.addPlayer(DefaultPlayer(0))
-            table.addPlayer(DefaultPlayer(1))
-
-            table.startNewHandWithSeed(emptyMap(), emptyList())
-
-            shouldThrow<IllegalArgumentException> {
-                table.addPlayer(DefaultPlayer(2))
-            }
-        }
-
         test("should correctly deal hole cards") {
             val player1 = DefaultPlayer(0)
             val player2 = DefaultPlayer(1)
@@ -45,28 +34,6 @@ class PokerTableTests : FunSpec() {
             table.holeCards.size shouldBe 2
             table.holeCardsForPlayer(player1).size shouldBe 2
             table.holeCardsForPlayer(player2).size shouldBe 2
-        }
-
-        test("should enforce a minimum of two players to deal cards") {
-            table.addPlayer(DefaultPlayer(0))
-
-            shouldThrow<IllegalArgumentException> {
-                table.dealHoleCards()
-            }
-        }
-
-        test("should post blinds correctly") {
-            table.addPlayer(DefaultPlayer(0))
-            table.addPlayer(DefaultPlayer(1))
-            table.addPlayer(DefaultPlayer(2))
-
-            table.dealHoleCards()
-            table.postBlinds(1, 2)
-
-            table.pot[table.players[1]] shouldBe 1
-            table.pot[table.players[2]] shouldBe 2
-
-            table.getPotTotal() shouldBe 3
         }
 
         test("should handle a player folding") {
@@ -89,14 +56,30 @@ class PokerTableTests : FunSpec() {
             table.addPlayer(player0)
             table.addPlayer(player1)
 
-            table.dealHoleCards()
-            table.postBlinds(1, 2)
+            table.dealHoleCards(amount = 2)
 
+            table.raise(player0, 2)
             table.call(player1)
 
             table.pot[player1] shouldBe 2f
             player0.bankroll shouldBe 98f
             player1.bankroll shouldBe 98f
+        }
+
+        test("should handle a player raising, then another re-raising") {
+            table.addPlayer(DefaultPlayer(0))
+            table.addPlayer(DefaultPlayer(1))
+            table.addPlayer(DefaultPlayer(2))
+
+            table.dealHoleCards(amount = 2)
+
+            table.raise(table.players[1], 1)
+            table.raise(table.players[2], 2)
+
+            table.pot[table.players[1]] shouldBe 1
+            table.pot[table.players[2]] shouldBe 3
+
+            table.getPotSize() shouldBe 4
         }
 
         test("should prevent a player from calling without sufficient bankroll") {
@@ -106,8 +89,9 @@ class PokerTableTests : FunSpec() {
             table.addPlayer(player0)
             table.addPlayer(player1)
 
-            table.dealHoleCards()
-            table.postBlinds(1, 2)
+            table.dealHoleCards(amount = 2)
+
+            table.raise(player1, 2)
 
             shouldThrow<IllegalArgumentException> {
                 table.call(player0)
@@ -120,7 +104,7 @@ class PokerTableTests : FunSpec() {
 
             table.dealHoleCards()
 
-            val flop = table.dealFlop()
+            val flop = table.dealCommunityCards(amount = 3)
 
             flop.size shouldBe 3
             table.communityCards.size shouldBe 3
@@ -136,13 +120,13 @@ class PokerTableTests : FunSpec() {
             }
             table.communityCards.size shouldBe 0
 
-            table.dealFlop()
+            table.dealCommunityCards(amount = 3)
             table.communityCards.size shouldBe 3
 
-            table.dealTurn()
+            table.dealCommunityCards(amount = 1)
             table.communityCards.size shouldBe 4
 
-            table.dealRiver()
+            table.dealCommunityCards(amount = 1)
             table.communityCards.size shouldBe 5
         }
 
@@ -181,6 +165,8 @@ class PokerTableTests : FunSpec() {
         }
 
         test("Full hand where everyone checks") {
+            val table = PokerTableImpl()
+
             val player1 = DefaultPlayer(0, bankroll = 1000f)
             val player2 = DefaultPlayer(1, bankroll = 1000f)
             val player3 = DefaultPlayer(2, bankroll = 1000f)
@@ -192,34 +178,46 @@ class PokerTableTests : FunSpec() {
             table.addPlayer(player4)
 
             // Pre-flop phase
-            table.dealHoleCards()
-            table.postBlinds(10, 20)
+            table.resetActivePlayers()
+
+            table.raise(player2, 10)
+            table.raise(player3, 10)
+
+            table.getPotSize() shouldBe 30
 
             table.call(player4)
             table.call(player1)
             table.call(player2)
             table.check(player3)
 
+            table.getPotSize() shouldBe 80
+
             // Flop phase
-            table.dealFlop()
+            table.dealCommunityCards(amount = 3)
             table.check(player2)
             table.check(player3)
             table.check(player4)
             table.check(player1)
+
+            table.getPotSize() shouldBe 80
 
             // Turn phase
-            table.dealTurn()
+            table.dealCommunityCards(amount = 1)
             table.check(player2)
             table.check(player3)
             table.check(player4)
             table.check(player1)
 
+            table.getPotSize() shouldBe 80
+
             // River phase
-            table.dealRiver()
+            table.dealCommunityCards(amount = 1)
             table.check(player2)
             table.check(player3)
             table.check(player4)
             table.check(player1)
+
+            table.getPotSize() shouldBe 80
 
             // Showdown
             val roundSummary = table.concludeRound()
@@ -240,35 +238,39 @@ class PokerTableTests : FunSpec() {
             table.addPlayer(player4)
 
             // Pre-flop phase
-            table.dealHoleCards()
-            table.postBlinds(10, 20)
+            table.resetActivePlayers()
+
+            table.raise(player2, 10)
+            table.raise(player3, 10)
+
+            table.getPotSize() shouldBe 30
 
             table.call(player4)
             table.call(player1)
             table.fold(player2)
             table.check(player3)
 
-            table.getPotTotal() shouldBe 70
+            table.getPotSize() shouldBe 70
 
             // Flop phase
-            table.dealFlop()
+            table.dealCommunityCards(amount = 3)
             table.raise(player3, 10)
             table.call(player4)
             table.fold(player1)
 
-            table.getPotTotal() shouldBe 90
+            table.getPotSize() shouldBe 90
 
             // Turn phase
-            table.dealTurn()
+            table.dealCommunityCards(amount = 1)
             table.check(player3)
             table.raise(player4, 10)
             table.raise(player3, 10)
             table.call(player4)
 
-            table.getPotTotal() shouldBe 130
+            table.getPotSize() shouldBe 130
 
             // River phase
-            table.dealRiver()
+            table.dealCommunityCards(amount = 1)
             table.check(player3)
             table.raise(player4, 20)
             table.call(player3)

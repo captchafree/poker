@@ -22,28 +22,17 @@ class ReadOnlyPokerTable(
 
     override fun startNewHandWithSeed(
         fixedHoleCards: Map<out Player, List<Card>>,
-        communityCards: List<Card>
+        communityCards: List<Card>,
+        numCardsToDealPerPlayer: Int
     ) {
         throw UnsupportedOperationException("This is a read only view of the poker table!!")
     }
 
-    override fun dealHoleCards() {
+    override fun dealHoleCards(amount: Int) {
         throw UnsupportedOperationException("This is a read only view of the poker table!!")
     }
 
-    override fun postBlinds(smallBlind: Int, bigBlind: Int) {
-        throw UnsupportedOperationException("This is a read only view of the poker table!!")
-    }
-
-    override fun dealRiver(): Card {
-        throw UnsupportedOperationException("This is a read only view of the poker table!!")
-    }
-
-    override fun dealTurn(): Card {
-        throw UnsupportedOperationException("This is a read only view of the poker table!!")
-    }
-
-    override fun dealFlop(): List<Card> {
+    override fun dealCommunityCards(amount: Int): List<Card> {
         throw UnsupportedOperationException("This is a read only view of the poker table!!")
     }
 

@@ -19,7 +19,7 @@ interface PokerTable {
     val pot: Map<Player, Int>
 
     /**
-     * player -> bets in the current round (preflop, flop, etc)
+     * player -> bets in the current round (pre-flop, flop, etc.)
      */
     val roundBets: Map<Player, Int>
 
@@ -40,21 +40,27 @@ interface PokerTable {
     fun removePlayer(player: Player)
     fun removePlayers(players: Collection<Player>)
 
-    fun getPotTotal(): Int
+    fun getPotSize(): Int
 
     fun startNewHandWithSeed(
         fixedHoleCards: Map<out Player, List<Card>>,
         communityCards: List<Card>,
+        numCardsToDealPerPlayer: Int = 2
     )
 
-    fun dealHoleCards()
-    fun postBlinds(smallBlind: Int, bigBlind: Int)
+    fun resetActivePlayers()
+    fun dealHoleCards(amount: Int = 2)
 
     fun holeCardsForPlayer(player: Player): List<Card>
 
-    fun dealFlop(): List<Card>
-    fun dealTurn(): Card
-    fun dealRiver(): Card
+    /**
+     * Deals a specified number of community cards
+     *
+     * @param amount The number of cards to deal. Must be >= 0.
+     * @return The dealt cards
+     */
+    fun dealCommunityCards(amount: Int): List<Card>
+    fun burnCards(amount: Int): List<Card>
 
     fun fold(player: Player)
     fun call(player: Player)
@@ -104,10 +110,6 @@ class PokerTableImpl : PokerTable {
     }
 
     override fun addPlayer(player: Player) {
-        require(holeCards.isEmpty()) {
-            "Cannot add a player in the middle of a hand"
-        }
-
         if (player !in players) {
             players.add(player)
         }
@@ -118,21 +120,18 @@ class PokerTableImpl : PokerTable {
     }
 
     override fun removePlayer(player: Player) {
-        require(holeCards.isEmpty()) {
-            "Cannot add a player in the middle of a hand"
-        }
-
         players.remove(player)
+    }
+
+    override fun resetActivePlayers() {
+        activePlayers = players.toMutableList()
     }
 
     override fun startNewHandWithSeed(
         fixedHoleCards: Map<out Player, List<Card>>,
         communityCards: List<Card>,
+        numCardsToDealPerPlayer: Int
     ) {
-        require(numPlayers > 1) {
-            "The game requires at least 2 players."
-        }
-
         deck = CardDeck.newStandardDeck()
         deck.shuffle()
         holeCards.clear()
@@ -154,13 +153,7 @@ class PokerTableImpl : PokerTable {
             }
         }
 
-        for (i in 0 + dealerIndex until (players.size * 2) + dealerIndex) {
-            val currHoleCards = holeCards.computeIfAbsent(players[i % players.size]) { mutableListOf() }
-
-            if (currHoleCards.size < 2) {
-                currHoleCards.add(deck.dealCard())
-            }
-        }
+        dealHoleCards(amount = numCardsToDealPerPlayer)
 
         players.forEach {
             pot[it] = 0
@@ -169,8 +162,7 @@ class PokerTableImpl : PokerTable {
     }
 
     override fun holeCardsForPlayer(player: Player): List<Card> {
-        return holeCards[player] ?:
-            error("Missing player $player")
+        return holeCards[player] ?: emptyList()
     }
 
     private fun startNewBettingRound() {
@@ -178,22 +170,16 @@ class PokerTableImpl : PokerTable {
         roundBets.clear()
     }
 
-    override fun dealHoleCards() {
+    override fun dealHoleCards(amount: Int) {
         activePlayers = players.toMutableList()
-
-        require(activePlayers.size >= 2) {
-            "Cannot deal cards with less than 2 active players."
-        }
-
-        holeCards.clear()
 
         for (i in 0 until players.size) {
             holeCards.computeIfAbsent(players[i]) { mutableListOf() }
         }
-        for (i in 0 + dealerIndex until (players.size * 2) + dealerIndex) {
+        for (i in 0 + dealerIndex until (players.size * amount) + dealerIndex) {
             val currHoleCards = holeCards[players[i % players.size]]!!
 
-            if (currHoleCards.size < 2) {
+            if (currHoleCards.size < amount) {
                 currHoleCards.add(deck.dealCard())
             }
         }
@@ -201,56 +187,26 @@ class PokerTableImpl : PokerTable {
         startNewBettingRound()
     }
 
-    override fun dealFlop(): List<Card> {
-        deck.dealCard() // Burn one card
-        return listOf(deck.dealCard(), deck.dealCard(), deck.dealCard()).also {
-            communityCards.addAll(it)
-            startNewBettingRound()
+    override fun burnCards(amount: Int): List<Card> {
+        return List(amount) {
+            deck.dealCard()
         }
     }
 
-    override fun dealTurn(): Card {
-        return dealTurnOrRiver()
-    }
-
-    override fun dealRiver(): Card {
-        return dealTurnOrRiver()
-    }
-
-    private fun dealTurnOrRiver(): Card {
-        deck.dealCard() // Burn one card
-        return deck.dealCard().also {
-            communityCards.add(it)
+    override fun dealCommunityCards(amount: Int): List<Card> {
+        return List(amount) {
+            deck.dealCard()
+        }.also { dealtCards ->
+            communityCards.addAll(dealtCards)
             startNewBettingRound()
         }
-    }
-
-    override fun postBlinds(smallBlind: Int, bigBlind: Int) {
-        require(smallBlind > 0 && bigBlind > 0) { "Blinds must be positive values." }
-        require(bigBlind > smallBlind) { "Big blind must be greater than small blind." }
-
-        val smallBlindPlayer = players[(dealerIndex + 1) % numPlayers]
-        val bigBlindPlayer = players[(dealerIndex + 2) % numPlayers]
-
-        pot[smallBlindPlayer] = smallBlind
-        pot[bigBlindPlayer] = bigBlind
-
-        roundBets[smallBlindPlayer] = smallBlind
-        roundBets[bigBlindPlayer] = bigBlind
-
-        currentBet = bigBlind
-
-        smallBlindPlayer.removeAmountFromBankroll(smallBlind.toFloat())
-        bigBlindPlayer.removeAmountFromBankroll(bigBlind.toFloat())
     }
 
     override fun fold(player: Player) {
-        require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         activePlayers.remove(player)
     }
 
     override fun call(player: Player) {
-        require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         val amountToCall = currentBet - player.getRoundBetOrZero()
         require(amountToCall > 0) { "Player ${player.id} has already matched the current bet." }
 
@@ -265,7 +221,6 @@ class PokerTableImpl : PokerTable {
     }
 
     override fun raise(player: Player, amount: Int) {
-        require(activePlayers.contains(player)) { "Player ${player.id} is not in the game." }
         require(amount > 0) { "Raise amount must be positive." }
 
         val newBet = currentBet + amount
@@ -298,11 +253,9 @@ class PokerTableImpl : PokerTable {
         require(player.getRoundBetOrZero() == currentBet) {
             "Player ${player.id} cannot check without matching the current bet of $currentBet."
         }
-
-        roundBets[player] = 0
     }
 
-    override fun getPotTotal(): Int {
+    override fun getPotSize(): Int {
         return pot.values.sum()
     }
 
@@ -311,10 +264,6 @@ class PokerTableImpl : PokerTable {
     }
 
     private fun computeWinners(): Set<Player> {
-        require(communityCards.size == 5) {
-            "Exactly 5 community cards must be shown. There are ${communityCards.size} currently shown."
-        }
-
         val hands = activePlayers.associateWith {
             communityCards + holeCardsForPlayer(it)
         }.toList()
@@ -340,7 +289,7 @@ class PokerTableImpl : PokerTable {
             computeWinners()
         }
 
-        val potTotal = getPotTotal()
+        val potTotal = getPotSize()
 
         // award funds to winners
         for (winner in winners) {
@@ -355,7 +304,7 @@ class PokerTableImpl : PokerTable {
             playerBets = players.associateWith {
                 it.getTotalPotBetOrZero()
             },
-            totalPotSize = getPotTotal(),
+            totalPotSize = getPotSize(),
             foldedPlayers = (players - activePlayers).toSet(),
             winners = winners.toSet()
         ).also {
